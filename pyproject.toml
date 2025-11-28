@@ -1,0 +1,25 @@
+[project]
+name = "primordial"
+version = "0.1.0"
+description = "Primordial life simulation with neural network agents"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.24",
+    "torch>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "maturin>=1.0",
+]
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+python-source = "."
+module-name = "primordial._rust"
+manifest-path = "rust/Cargo.toml"
