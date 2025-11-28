@@ -83,6 +83,8 @@ class IntegratedTeachingApp:
                     "type": "agent",
                     "position": (wrapper.agent.position.x, wrapper.agent.position.y),
                     "radius": wrapper.agent.radius,
+                    "angle": wrapper.agent.angle,
+                    "is_eating": wrapper.agent.is_eating,
                 })
 
         # Add food
@@ -97,10 +99,16 @@ class IntegratedTeachingApp:
         # Add predators
         for predator in self.simulation.world.predators:
             if predator.is_active:
+                # Get predator angle from velocity if available
+                angle = 0
+                if hasattr(predator, 'velocity') and predator.velocity.magnitude() > 0.1:
+                    import math
+                    angle = math.atan2(predator.velocity.y, predator.velocity.x)
                 entities.append({
                     "type": "predator",
                     "position": (predator.position.x, predator.position.y),
                     "radius": predator.radius,
+                    "angle": angle,
                 })
 
         return {"entities": entities}

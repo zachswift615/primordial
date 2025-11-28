@@ -12,8 +12,10 @@ class Colors:
     PANEL_BG = (30, 30, 40)
     TEXT = (200, 200, 200)
     TEXT_BRIGHT = (255, 255, 255)
-    AGENT = (100, 200, 255)
-    ENTITY = (255, 200, 100)
+    AGENT = (100, 200, 255)       # Blue - the learning agent
+    FOOD = (100, 255, 100)        # Green - food to eat
+    PREDATOR = (255, 80, 80)      # Red - dangerous predators
+    ENTITY = (255, 200, 100)      # Orange - generic entity
     REWARD = (100, 255, 100)
     PUNISH = (255, 100, 100)
     POINT_CURSOR = (255, 255, 0)

@@ -79,20 +79,59 @@ class WorldViewPanel(BasePanel):
     def _draw_entities(self, surface: pygame.Surface, entities: list,
                       zoom: float, offset: tuple) -> None:
         """Draw world entities."""
-        for entity in entities:
+        import math
+
+        # Draw in order: food first, then predators, then agents on top
+        draw_order = {"food": 0, "predator": 1, "agent": 2}
+        sorted_entities = sorted(entities, key=lambda e: draw_order.get(e.get("type"), 0))
+
+        for entity in sorted_entities:
             pos = entity.get("position", (0, 0))
             entity_type = entity.get("type", "unknown")
+            entity_radius = entity.get("radius", 10)
 
             # Transform position with zoom and offset
             screen_x = int((pos[0] - offset[0]) * zoom)
             screen_y = int((pos[1] - offset[1]) * zoom)
 
-            # Choose color based on type
-            color = self.config.colors.AGENT if entity_type == "agent" else self.config.colors.ENTITY
+            # Choose color and size based on type
+            if entity_type == "agent":
+                color = self.config.colors.AGENT
+                radius = max(8, int(entity_radius * zoom))
+                # Draw agent with direction indicator
+                pygame.draw.circle(surface, color, (screen_x, screen_y), radius)
+                # Draw outline
+                pygame.draw.circle(surface, (255, 255, 255), (screen_x, screen_y), radius, 2)
+                # Draw direction indicator if angle provided
+                angle = entity.get("angle", 0)
+                dir_len = radius + 8
+                end_x = screen_x + int(math.cos(angle) * dir_len)
+                end_y = screen_y + int(math.sin(angle) * dir_len)
+                pygame.draw.line(surface, (255, 255, 255), (screen_x, screen_y), (end_x, end_y), 3)
 
-            # Draw circle
-            radius = max(3, int(10 * zoom))
-            pygame.draw.circle(surface, color, (screen_x, screen_y), radius)
+            elif entity_type == "food":
+                color = self.config.colors.FOOD
+                radius = max(4, int(entity_radius * zoom * 0.8))
+                pygame.draw.circle(surface, color, (screen_x, screen_y), radius)
+
+            elif entity_type == "predator":
+                color = self.config.colors.PREDATOR
+                radius = max(6, int(entity_radius * zoom))
+                # Draw predator as a triangle pointing in direction
+                angle = entity.get("angle", 0)
+                points = []
+                for i in range(3):
+                    a = angle + i * (2 * math.pi / 3)
+                    px = screen_x + int(math.cos(a) * radius)
+                    py = screen_y + int(math.sin(a) * radius)
+                    points.append((px, py))
+                pygame.draw.polygon(surface, color, points)
+                pygame.draw.polygon(surface, (255, 100, 100), points, 2)
+
+            else:
+                color = self.config.colors.ENTITY
+                radius = max(4, int(entity_radius * zoom))
+                pygame.draw.circle(surface, color, (screen_x, screen_y), radius)
 
 
 class AgentPOVPanel(BasePanel):
@@ -264,18 +303,18 @@ class ControlsPanel(BasePanel):
         self.draw_panel_background(surface, rect)
 
         x, y = rect[0] + 10, rect[1] + 10
-        line_height = 20
+        line_height = 18
 
+        # Legend and controls
         controls = [
-            "Controls & Help",
-            "SPACE=Reward  X=Punish  C=Control Mode",
-            "ARROWS=Move (in control mode)",
-            "CLICK=Point  SCROLL=Zoom",
-            "S=Save  L=Load  ESC=Quit"
+            ("Legend & Controls", self.config.colors.TEXT_BRIGHT, self.font),
+            ("BLUE circle = Agent (learning AI)    GREEN = Food    RED triangle = Predator", self.config.colors.TEXT, self.font_small),
+            ("", self.config.colors.TEXT, self.font_small),
+            ("TEACHING: SPACE=Reward (good!)  X=Punish (bad!)  - Agent learns from your feedback", self.config.colors.REWARD, self.font_small),
+            ("CONTROL:  C=Toggle control mode, then ARROWS to move agent toward food", self.config.colors.AGENT, self.font_small),
+            ("Agent eats GREEN food when close + hungry. Avoid RED predators! ESC=Quit", self.config.colors.TEXT, self.font_small),
         ]
 
-        for i, line in enumerate(controls):
-            font = self.font if i == 0 else self.font_small
-            color = self.config.colors.TEXT_BRIGHT if i == 0 else self.config.colors.TEXT
+        for i, (line, color, font) in enumerate(controls):
             text = font.render(line, True, color)
             surface.blit(text, (x, y + i * line_height))
