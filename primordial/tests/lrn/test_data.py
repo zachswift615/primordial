@@ -25,13 +25,14 @@ def test_sensory_target_is_shifted():
     # Use low noise for this test to ensure clear correlation
     batch = generate_multitask_batch(batch_size=1, seq_len=64, reward_horizon=5, noise_std=0.01)
 
-    # Target should be input shifted by 1 step
-    input_seq = batch["input"][0, :-1, 0]
-    target_seq = batch["sensory_target"][0, 1:, 0]
+    # Target[t] should equal Input[t+1] (shifted by 1 step)
+    # So Input[1:] should correlate highly with Target[:-1]
+    input_shifted = batch["input"][0, 1:, 0]  # input positions 1 to seq_len-1
+    target_early = batch["sensory_target"][0, :-1, 0]  # target positions 0 to seq_len-2
 
-    # They should be correlated (same underlying signal)
-    correlation = torch.corrcoef(torch.stack([input_seq, target_seq]))[0, 1]
-    assert correlation > 0.9, f"Low correlation: {correlation}"
+    # These should be the same position in the original noisy signal
+    correlation = torch.corrcoef(torch.stack([input_shifted, target_early]))[0, 1]
+    assert correlation > 0.99, f"Low correlation: {correlation}"
 
 
 def test_reward_target_values():
