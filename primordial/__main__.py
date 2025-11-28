@@ -45,16 +45,26 @@ def main():
 
 
 def run_interface(args):
-    """Run the teaching interface."""
+    """Run the teaching interface with live simulation."""
     from primordial.interface.config import UIConfig
-    from primordial.interface.app import TeachingApp
+    from primordial.interface.integrated_app import IntegratedTeachingApp
+    from primordial.simulation.config import SimulationConfig
 
-    config = UIConfig()
-    config.fps = args.fps
-    config.window_width = args.width
-    config.window_height = args.height
+    ui_config = UIConfig()
+    ui_config.fps = args.fps
+    ui_config.window_width = args.width
+    ui_config.window_height = args.height
 
-    app = TeachingApp(config)
+    sim_config = SimulationConfig(
+        world_width=640,
+        world_height=480,
+        max_agents=1,
+        predator_count=2,
+        initial_food=30,
+        learning_enabled=True,
+    )
+
+    app = IntegratedTeachingApp(ui_config, sim_config)
 
     if args.no_audio:
         app.audio_capture.stop()
