@@ -16,6 +16,13 @@ from .encoders import (
 )
 from .genome import GenomeModulator
 from .architecture import LivingResonanceNetwork
+from .learning import (
+    RewardHistoryBuffer,
+    GradientClipper,
+    ExponentialMovingAverage,
+    GradientMonitor,
+    OnlineLRScheduler,
+)
 
 __all__ = [
     "PrototypeConfig",
@@ -38,4 +45,9 @@ __all__ = [
     "TouchEncoder",
     "GenomeModulator",
     "LivingResonanceNetwork",
+    "RewardHistoryBuffer",
+    "GradientClipper",
+    "ExponentialMovingAverage",
+    "GradientMonitor",
+    "OnlineLRScheduler",
 ]
