@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 from .config import PrototypeConfig
+from .utils import init_spectral_filter
 
 
 class FourierMixingLayer(nn.Module):
@@ -45,16 +46,8 @@ class FourierMixingLayer(nn.Module):
         This matches biological and empirical observations that neural networks
         learn low frequencies first.
         """
-        # Frequency decay: exp(-freq / (freq_bins / 4))
-        freqs = torch.arange(self.freq_bins, dtype=torch.float32)
-        decay = torch.exp(-freqs / (self.freq_bins / 4))
-
-        # Initialize with decay applied
-        # Shape: (seq_len, freq_bins, 2) for real and imaginary
-        filter_init = torch.randn(self.seq_len, self.freq_bins, 2) * 0.1
-        filter_init = filter_init * decay.unsqueeze(0).unsqueeze(-1)
-
-        return filter_init
+        # Use shared utility function
+        return init_spectral_filter(self.seq_len, self.freq_bins)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
