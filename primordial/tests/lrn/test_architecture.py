@@ -472,3 +472,169 @@ def test_different_batch_sizes(config):
         assert predictions.shape == (batch_size, 343)
         assert reward_preds.shape == (batch_size, 5)
         assert actions.shape == (batch_size, 5)
+
+
+def test_compile_parameter(config):
+    """Test that compile parameter works correctly."""
+    # Create model with compile=False (default)
+    model_no_compile = LivingResonanceNetwork(config, compile=False)
+    assert model_no_compile._compile_enabled is False
+    assert model_no_compile._compiled_forward is None
+
+    # Create model with compile=True
+    model_with_compile = LivingResonanceNetwork(config, compile=True)
+
+    # If torch.compile is available, it should be enabled
+    if hasattr(torch, 'compile'):
+        assert model_with_compile._compile_enabled is True
+        assert model_with_compile._compiled_forward is not None
+    else:
+        # If torch.compile is not available, it should fall back gracefully
+        assert model_with_compile._compile_enabled is False
+
+
+def test_compiled_model_forward(config, batch_inputs):
+    """Test that compiled model produces correct outputs."""
+    # Skip if torch.compile not available
+    if not hasattr(torch, 'compile'):
+        pytest.skip("torch.compile not available")
+
+    model = LivingResonanceNetwork(config, compile=True)
+
+    predictions, reward_preds, actions = model(
+        batch_inputs['vision'],
+        batch_inputs['audio'],
+        batch_inputs['proprio'],
+        batch_inputs['touch'],
+        batch_inputs['genome']
+    )
+
+    batch_size = batch_inputs['vision'].shape[0]
+
+    # Check shapes are correct
+    assert predictions.shape == (batch_size, 343)
+    assert reward_preds.shape == (batch_size, 5)
+    assert actions.shape == (batch_size, 5)
+
+    # Check outputs are finite
+    assert torch.isfinite(predictions).all()
+    assert torch.isfinite(reward_preds).all()
+    assert torch.isfinite(actions).all()
+
+
+def test_compiled_vs_non_compiled_equivalence(config, single_inputs):
+    """Test that compiled and non-compiled models produce same results."""
+    # Skip if torch.compile not available
+    if not hasattr(torch, 'compile'):
+        pytest.skip("torch.compile not available")
+
+    # Create two models with same initialization
+    torch.manual_seed(42)
+    model_no_compile = LivingResonanceNetwork(config, compile=False)
+
+    torch.manual_seed(42)
+    model_compiled = LivingResonanceNetwork(config, compile=True)
+
+    # Set to eval mode for deterministic behavior
+    model_no_compile.eval()
+    model_compiled.eval()
+
+    with torch.no_grad():
+        # Get outputs from non-compiled model
+        pred1, reward1, action1 = model_no_compile(
+            single_inputs['vision'],
+            single_inputs['audio'],
+            single_inputs['proprio'],
+            single_inputs['touch'],
+            single_inputs['genome']
+        )
+
+        # Get outputs from compiled model
+        pred2, reward2, action2 = model_compiled(
+            single_inputs['vision'],
+            single_inputs['audio'],
+            single_inputs['proprio'],
+            single_inputs['touch'],
+            single_inputs['genome']
+        )
+
+    # Outputs should be very close (allowing for minor numerical differences)
+    assert torch.allclose(pred1, pred2, atol=1e-4)
+    assert torch.allclose(reward1, reward2, atol=1e-4)
+    assert torch.allclose(action1, action2, atol=1e-4)
+
+
+def test_inference_mode_context_manager(config, batch_inputs):
+    """Test that inference_mode context manager works correctly."""
+    model = LivingResonanceNetwork(config)
+
+    # Initially in training mode
+    assert model.training is True
+
+    # Enter inference mode
+    with model.inference_mode() as m:
+        # Should be in eval mode
+        assert m.training is False
+        assert model.training is False
+
+        # Forward pass should work
+        predictions, reward_preds, actions = model(
+            batch_inputs['vision'],
+            batch_inputs['audio'],
+            batch_inputs['proprio'],
+            batch_inputs['touch'],
+            batch_inputs['genome']
+        )
+
+        # Check shapes are correct
+        batch_size = batch_inputs['vision'].shape[0]
+        assert predictions.shape == (batch_size, 343)
+        assert reward_preds.shape == (batch_size, 5)
+        assert actions.shape == (batch_size, 5)
+
+        # Gradients should not be computed
+        assert not predictions.requires_grad
+        assert not reward_preds.requires_grad
+        assert not actions.requires_grad
+
+    # After exiting, should be back in training mode
+    assert model.training is True
+
+
+def test_inference_mode_restores_state(config):
+    """Test that inference_mode restores original training state."""
+    model = LivingResonanceNetwork(config)
+
+    # Test from training mode
+    model.train()
+    assert model.training is True
+    with model.inference_mode():
+        pass
+    assert model.training is True
+
+    # Test from eval mode
+    model.eval()
+    assert model.training is False
+    with model.inference_mode():
+        pass
+    assert model.training is False
+
+
+def test_inference_mode_no_gradients(config, batch_inputs):
+    """Test that inference_mode prevents gradient computation."""
+    model = LivingResonanceNetwork(config)
+
+    with model.inference_mode():
+        predictions, reward_preds, actions = model(
+            batch_inputs['vision'],
+            batch_inputs['audio'],
+            batch_inputs['proprio'],
+            batch_inputs['touch'],
+            batch_inputs['genome']
+        )
+
+        # Attempt to compute gradients should fail or do nothing
+        # (no requires_grad, so backward would fail)
+        assert not predictions.requires_grad
+        assert not reward_preds.requires_grad
+        assert not actions.requires_grad

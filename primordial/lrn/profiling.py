@@ -118,14 +118,15 @@ def get_memory_usage():
         return 0.0
 
 
-def profile_batch_size(batch_size: int, config: LRNConfig):
+def profile_batch_size(batch_size: int, config: LRNConfig, compile: bool = False):
     """Profile model with specific batch size."""
+    compile_str = " (COMPILED)" if compile else ""
     print(f"\n{'=' * 70}")
-    print(f"BATCH SIZE: {batch_size}")
+    print(f"BATCH SIZE: {batch_size}{compile_str}")
     print('=' * 70)
 
     # Create model
-    model = LivingResonanceNetwork(config)
+    model = LivingResonanceNetwork(config, compile=compile)
     total_params = sum(p.numel() for p in model.parameters())
 
     # Generate data
@@ -176,6 +177,7 @@ def profile_batch_size(batch_size: int, config: LRNConfig):
 
     return {
         'batch_size': batch_size,
+        'compile': compile,
         'forward': forward_stats,
         'backward': backward_stats,
         'params': total_params,
@@ -208,33 +210,68 @@ def main():
     print(f"  Reward horizon: {config.reward_horizon}")
     print(f"  Device: {'CUDA' if torch.cuda.is_available() else 'CPU'}")
 
+    # Check if torch.compile is available
+    compile_available = hasattr(torch, 'compile')
+    print(f"  torch.compile available: {compile_available}")
+
     # Profile different batch sizes
     results = []
 
-    # Batch size 1 - online learning
-    results.append(profile_batch_size(1, config))
+    # Batch size 1 - online learning (non-compiled)
+    results.append(profile_batch_size(1, config, compile=False))
 
-    # Batch size 8 - batched learning
-    results.append(profile_batch_size(8, config))
+    # Batch size 8 - batched learning (non-compiled)
+    results.append(profile_batch_size(8, config, compile=False))
+
+    # If torch.compile is available, test compiled versions
+    if compile_available:
+        # Batch size 1 - online learning (compiled)
+        results.append(profile_batch_size(1, config, compile=True))
+
+        # Batch size 8 - batched learning (compiled)
+        results.append(profile_batch_size(8, config, compile=True))
 
     # Summary
     print(f"\n{'=' * 70}")
     print("SUMMARY")
     print('=' * 70)
-    print(f"\n{'Batch':>8} | {'Forward (ms)':>14} | {'Backward (ms)':>14} | {'Throughput':>12}")
-    print('-' * 70)
+    print(f"\n{'Batch':>8} | {'Compiled':>9} | {'Forward (ms)':>14} | {'Backward (ms)':>14} | {'Throughput':>12}")
+    print('-' * 78)
     for r in results:
         batch = r['batch_size']
+        compiled = 'Yes' if r.get('compile', False) else 'No'
         fwd = r['forward']['mean_ms']
         bwd = r['backward']['mean_ms']
         throughput = batch / (fwd / 1000)
-        print(f"{batch:>8} | {fwd:>14.3f} | {bwd:>14.3f} | {throughput:>10.1f} s/s")
+        print(f"{batch:>8} | {compiled:>9} | {fwd:>14.3f} | {bwd:>14.3f} | {throughput:>10.1f} s/s")
 
-    print('=' * 70)
+    # Compute speedups if torch.compile was available
+    if compile_available and len(results) == 4:
+        print(f"\n{'=' * 70}")
+        print("TORCH.COMPILE SPEEDUP")
+        print('=' * 70)
+
+        # Batch size 1 speedup
+        batch1_non_compiled_fwd = results[0]['forward']['mean_ms']
+        batch1_compiled_fwd = results[2]['forward']['mean_ms']
+        batch1_speedup = batch1_non_compiled_fwd / batch1_compiled_fwd
+
+        # Batch size 8 speedup
+        batch8_non_compiled_fwd = results[1]['forward']['mean_ms']
+        batch8_compiled_fwd = results[3]['forward']['mean_ms']
+        batch8_speedup = batch8_non_compiled_fwd / batch8_compiled_fwd
+
+        print(f"\nForward pass speedup:")
+        print(f"  Batch size 1: {batch1_speedup:.2f}x ({batch1_non_compiled_fwd:.3f} ms -> {batch1_compiled_fwd:.3f} ms)")
+        print(f"  Batch size 8: {batch8_speedup:.2f}x ({batch8_non_compiled_fwd:.3f} ms -> {batch8_compiled_fwd:.3f} ms)")
+
+    print(f"\n{'=' * 70}")
     print("\nKey takeaways:")
     print("  - Online learning (batch=1) shows per-sample latency")
     print("  - Batched learning (batch=8) shows throughput capacity")
     print("  - Backward pass includes forward + gradient computation")
+    if compile_available:
+        print("  - torch.compile can provide significant speedups")
     print("  - LRN is designed for real-time embodied AI agents")
     print('=' * 70)
 

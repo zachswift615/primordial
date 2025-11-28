@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict, Optional, Tuple
+from contextlib import contextmanager
 
 from .lrn_config import LRNConfig
 from .encoders import VisionEncoder, AudioEncoder, ProprioEncoder, TouchEncoder
@@ -20,9 +21,11 @@ class LivingResonanceNetwork(nn.Module):
     to predict future sensory states, rewards, and actions.
     """
 
-    def __init__(self, config: LRNConfig):
+    def __init__(self, config: LRNConfig, compile: bool = False):
         super().__init__()
         self.config = config
+        self._compile_enabled = compile
+        self._compiled_forward = None
 
         # Modality encoders
         self.vision_encoder = VisionEncoder(config)
@@ -48,6 +51,24 @@ class LivingResonanceNetwork(nn.Module):
             self.genome_modulator = None
 
         self._init_weights()
+
+        # Apply torch.compile if requested and available
+        if self._compile_enabled:
+            self._apply_compile()
+
+    def _apply_compile(self):
+        """Apply torch.compile to forward pass if available."""
+        try:
+            if hasattr(torch, 'compile'):
+                # Compile the _forward_impl method for better performance
+                self._compiled_forward = torch.compile(self._forward_impl)
+            else:
+                # torch.compile not available (older PyTorch)
+                print("Warning: torch.compile requested but not available. Using eager mode.")
+                self._compile_enabled = False
+        except Exception as e:
+            print(f"Warning: torch.compile failed ({e}). Using eager mode.")
+            self._compile_enabled = False
 
     def _init_weights(self):
         """Initialize weights for stable online learning."""
@@ -89,7 +110,7 @@ class LivingResonanceNetwork(nn.Module):
                     if module.bias is not None:
                         nn.init.zeros_(module.bias)
 
-    def forward(
+    def _forward_impl(
         self,
         vision: torch.Tensor,
         audio: torch.Tensor,
@@ -98,7 +119,7 @@ class LivingResonanceNetwork(nn.Module):
         genome: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Forward pass through LRN.
+        Internal forward implementation (can be compiled).
 
         Args:
             vision: (batch, 32, 4)
@@ -144,6 +165,61 @@ class LivingResonanceNetwork(nn.Module):
         actions = self.action_head(pooled)
 
         return predictions, reward_preds, actions
+
+    def forward(
+        self,
+        vision: torch.Tensor,
+        audio: torch.Tensor,
+        proprio: torch.Tensor,
+        touch: torch.Tensor,
+        genome: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Forward pass through LRN.
+
+        Args:
+            vision: (batch, 32, 4)
+            audio: (batch, 100, 2)
+            proprio: (batch, 7)
+            touch: (batch, 8)
+            genome: (batch, 100) - optional genome vector
+
+        Returns:
+            predictions: (batch, 343) - predicted next sensory state
+            reward_preds: (batch, 5) - predicted upcoming rewards
+            actions: (batch, 5) - action outputs
+        """
+        # Use compiled forward if available, otherwise use _forward_impl
+        if self._compile_enabled and self._compiled_forward is not None:
+            return self._compiled_forward(vision, audio, proprio, touch, genome)
+        else:
+            return self._forward_impl(vision, audio, proprio, touch, genome)
+
+    @contextmanager
+    def inference_mode(self):
+        """
+        Context manager for inference mode.
+
+        Disables gradient computation and sets model to eval mode.
+        Use this for faster inference during deployment or evaluation.
+
+        Example:
+            with model.inference_mode():
+                predictions, rewards, actions = model(vision, audio, proprio, touch)
+        """
+        # Store original training state
+        was_training = self.training
+
+        try:
+            # Set to eval mode
+            self.eval()
+
+            # Disable gradient computation
+            with torch.no_grad():
+                yield self
+        finally:
+            # Restore original training state
+            self.train(was_training)
 
     def compute_loss(
         self,
