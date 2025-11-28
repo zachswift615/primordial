@@ -1,4 +1,4 @@
-# Session Handoff: Rust Optimization + Learning System Complete
+# Session Handoff: Human Interface Complete + Integration Plan Ready
 
 **Created:** 2025-11-28
 **Purpose:** Enable continuation in a fresh context with complete precision
@@ -6,322 +6,152 @@
 ---
 
 <original_task>
-Continue executing the Primordial implementation plans using subagent-driven development. Previous sessions completed:
+Continue the Primordial implementation. Previous sessions completed:
 1. LRN Architecture (185 tests)
 2. World System (275 tests)
 3. Agent Body (83 tests)
+4. Rust Performance (6 tests)
+5. Learning System (61 tests)
 
-This session was to:
-1. Execute the Rust Performance Optimization plan (`primordial/plans/03-rust-performance.md`)
-2. Execute the Online Learning System plan (`primordial/plans/04-learning-system.md`)
+This session completed:
+6. Human Interface (41 tests)
+7. Created Integration & Experiments plan
 </original_task>
 
 <work_completed>
-## Rust Performance Optimization - COMPLETE (6 commits)
+## Human Interface - COMPLETE (10 commits, 41 tests)
 
-### Commit `4a88cea` - Phase 1: Project Setup
-Created complete Rust/PyO3 infrastructure:
-- `pyproject.toml` - Maturin build configuration
-- `Cargo.toml` - Workspace at project root
-- `rust/Cargo.toml` - Crate config (PyO3 0.22, numpy 0.22, ndarray, rayon)
-- `rust/src/lib.rs` - PyO3 module definition
-- `rust/src/geometry.rs` - Vec2 pyclass with magnitude/normalized/dot
-- `primordial/_rust.pyi` - Type stubs for IDE support
-- `.gitignore` - Exclude build artifacts
+### Components Implemented
+| File | Purpose | Tests |
+|------|---------|-------|
+| `interface/config.py` | UI configuration, colors, layout, keybindings | 3 |
+| `interface/teaching_signals.py` | Reward/punishment/point/demo signal system | 7 |
+| `interface/audio_capture.py` | Background microphone capture with circular buffer | 5 |
+| `interface/input_handler.py` | Unified keyboard/mouse/controller input | 6 |
+| `interface/demo_mode.py` | Human-controls-agent demonstration mode | 6 |
+| `interface/ui_panels.py` | Header, WorldView, AgentPOV, Status, Metrics, Waveform, Controls | 4 |
+| `interface/renderer.py` | Main rendering engine with panel management | 3 |
+| `interface/app.py` | Main application loop with event processing | 3 |
+| `tests/interface/test_integration.py` | End-to-end integration tests | 4 |
+| `__main__.py` | CLI entry point | - |
 
-### Commit `f0f9792` - Phase 2: Core Raycasting
-Implemented ray-circle intersection algorithm:
-- `rust/src/raycast.rs` (169 lines):
-  - `ray_circle_intersection()` - Optimized quadratic solver
-  - `RayHit` struct for ray results
-  - `cast_ray()` helper with closest-wins logic
-  - `raycast_vision()` PyO3 function with ignore_entity_id
-- `primordial/tests/test_rust_raycast.py` - 4 unit tests
+### Key Features
+- **Multi-panel UI**: World view (top-down), Agent POV (first-person), Status, Metrics, Waveform, Controls
+- **Teaching signals**: SPACE=Reward, X=Punish, Click=Point, Arrows=Demo movement
+- **Audio capture**: Real-time microphone with circular buffer
+- **Controller support**: Game controller with analog sticks
+- **State persistence**: Save/load agent state
 
-### Commit `b0791d5` - Phase 3: Spatial Grid
-Implemented DDA (Digital Differential Analyzer) acceleration:
-- `rust/src/spatial.rs` (134 lines):
-  - `SpatialGrid` struct with HashMap cells
-  - `build()` - Entity registration with radius expansion
-  - `query_ray_dda()` - Amanatides & Woo algorithm
-- Module is internal, reserved for future optimization when entity count >500
+### Run Command
+```bash
+python -m primordial interface
+# or simply
+python -m primordial
+```
 
-### Commit `e06cf56` - Phase 4: Parallel Batch Processing
-Implemented multi-agent parallel vision:
-- `rust/src/batch.rs` (116 lines):
-  - `batch_raycast_vision()` - Process all agents in parallel
-  - Uses `py.allow_threads()` for GIL release
-  - Rayon parallel iterators with conditional compilation
-  - Returns (num_agents, num_rays, 4) 3D array
-- Performance: 715M ray casts/sec
+## Integration Plan Created
 
-### Commit `0d338e8` - Phase 5: Python Integration
-Integrated Rust backend into sensors:
-- `primordial/world/helpers_rust.py` (130 lines):
-  - `RUST_AVAILABLE` flag for runtime detection
-  - `get_vision_input_fast()` with fallback to Python
-  - Version compatibility checking
-- `primordial/agents/sensors.py` - VisionSensor uses Rust backend
-- `primordial/agents/body.py` - Pass `ignore_entity_id=self.id`
-- `primordial/world/helpers.py` - Added `ignore_entity_id` parameter
+Created comprehensive plan at `primordial/plans/06-integration-and-experiments.md`:
 
-### Commit `89e9e39` - Phase 6: Benchmarks & CI
-Created performance tests and CI pipeline:
-- `primordial/tests/test_rust_performance.py`:
-  - `test_rust_faster_than_python` - Verifies >5x speedup
-  - `test_rust_python_equivalence` - Verifies output matches
-- `.github/workflows/rust-build.yml`:
-  - Tests on ubuntu, macos, windows
-  - Python 3.11 and 3.12
-  - Builds and uploads wheel artifacts
+### 10 Tasks in Plan
+1. Simulation Configuration
+2. Agent Wrapper (combines Body + LRN + LearningLoop)
+3. Main Simulation Class
+4. Metrics Collector
+5. Base Experiment Class
+6. Survival Baseline Experiment (Learning ON vs OFF)
+7. Teaching Impact Experiment
+8. CLI for Running Experiments
+9. Update Package Exports
+10. Full Pipeline Integration Test
 
-**Performance Achieved:**
-- Python: 1.56ms per agent vision
-- Rust: 0.14ms per agent vision
-- **Speedup: 10.9x** (target was 5x)
-
----
-
-## Online Learning System - COMPLETE (1 commit)
-
-### Commit `f963318` - Phases 1-3: Complete Implementation
-
-**Phase 1 - Core Infrastructure:**
-- `primordial/learning/losses.py`:
-  - `PredictionLoss` class with MSE for sensory/reward prediction
-  - Supports reduction='mean' or 'none'
-
-- `primordial/learning/rewards.py`:
-  - `RewardHistoryBuffer` - Tracks predictions for multi-task learning (O(1) lookups)
-  - `SurvivalRewards` - Event-based (+1 eat, -2 damage, -10 death) and continuous rewards
-  - `HumanTeaching` - Distributes reward/punish over time window
-  - `RewardCombiner` - Combines survival + teaching with weights
-
-- `primordial/learning/optimizer.py`:
-  - `RewardModulatedOptimizer` - Gradient modulation (linear/sigmoid/exponential)
-  - `OnlineLRScheduler` - Warmup + exponential decay
-
-**Phase 2 - Stability & Loop:**
-- `primordial/learning/stability.py`:
-  - `GradientClipper` - Clip by norm or value
-  - `GradientAccumulator` - Accumulate over steps
-  - `ExponentialMovingAverage` - EMA of weights for stable inference
-  - `GradientMonitor` - Track gradient statistics
-
-- `primordial/learning/learning_loop.py`:
-  - `OnlineLearningLoop` - Main loop integrating all components
-  - Methods: `step()`, `on_death()`, `save_checkpoint()`, `load_checkpoint()`
-
-**Phase 3 - Auxiliary Systems:**
-- `primordial/learning/checkpointing.py`:
-  - `DeathHandler` - Checkpoint on death, LR reduction, optimizer reset
-  - `DeathReplay` - Optional experience replay
-
-- `primordial/learning/metrics.py`:
-  - `LearningMetrics` - Track loss, rewards, gradients, LR
-  - `LearningVisualizer` - TensorBoard/WandB (optional dependencies)
-
-- `primordial/config/learning_config.yaml` - Complete hyperparameter configuration
-
-**Tests Created (61 total):**
-- `test_losses.py` - 5 tests
-- `test_rewards.py` - 16 tests (including RewardHistoryBuffer)
-- `test_stability.py` - 9 tests
-- `test_learning_loop.py` - 8 tests
-- `test_checkpointing.py` - 10 tests
-- `test_metrics.py` - 13 tests
+### Success Criteria from Master Plan
+| Criterion | Target | Experiment |
+|-----------|--------|------------|
+| Survival improvement with learning | >5x | `survival_baseline.py` |
+| Teaching acceleration | >2x | `teaching_impact.py` |
+| Forward pass latency | <10ms | Manual profiling |
+| Frame rate | 60 FPS | Interface FPS counter |
+| Catastrophic forgetting | None over 1 hour | Long-run metrics |
 </work_completed>
 
-<work_remaining>
-## Immediate Next: Human Interface Plan
-
-Execute `primordial/plans/05-human-interface.md`:
-
-### Phase 1: Core Rendering
-1. Create `primordial/interface/renderer.py`:
-   - Pygame-based real-time visualization
-   - Entity rendering with type-based colors
-   - Camera following selected agent
-   - World bounds and grid overlay
-
-2. Create `primordial/interface/camera.py`:
-   - Camera class with position, zoom
-   - Follow agent mode
-   - Pan/zoom controls
-
-### Phase 2: Agent View
-1. Create `primordial/interface/agent_view.py`:
-   - Display agent's sensory input as the agent "sees" it
-   - Vision rays visualization
-   - Audio waveform display
-   - Proprioception meters (health, energy)
-
-### Phase 3: Teaching Interface
-1. Create `primordial/interface/teaching_panel.py`:
-   - Reward button (R key or click)
-   - Punish button (P key or click)
-   - Visual feedback for teaching signals
-   - Integration with HumanTeaching class
-
-### Phase 4: Metrics Dashboard
-1. Create `primordial/interface/dashboard.py`:
-   - Real-time learning metrics display
-   - Loss graphs
-   - Reward history
-   - Agent statistics (health, energy, age)
-
-### Phase 5: Main Application
-1. Create `primordial/interface/app.py`:
-   - Main game loop integrating all components
-   - Keyboard/mouse input handling
-   - Pause/resume simulation
-   - Agent selection
-
-## After Human Interface: Integration Testing
-- Connect AgentBody with OnlineLearningLoop
-- Test learning in simulated environment
-- Verify reward signals affect learning
-- Validate checkpoint persistence across deaths
-</work_remaining>
-
-<attempted_approaches>
-## Rust Build Issues (Resolved)
-
-**Issue:** `maturin develop` failed without virtualenv
-- **Solution:** Used `maturin build --release` then `pip install` wheel
-- **Additional fix:** Copied `.so` file to local `primordial/` directory for development
-
-**Issue:** Module import failed from project directory
-- **Cause:** Python found local `primordial/` before site-packages
-- **Solution:** Copy `_rust.cpython-313-darwin.so` to `primordial/` after each build
-
-## Code Review Findings (All Resolved)
-
-**Phase 5 Critical Issue:** Python fallback didn't support `ignore_entity_id`
-- **Location:** `primordial/world/helpers.py` and `helpers_rust.py`
-- **Fix:** Added `ignore_entity_id` parameter to `get_vision_input()` (lines 21-28, 81-82)
-- **Fix:** Updated fallback call in `helpers_rust.py` (lines 122-126)
-
-## Learning System Issues (None)
-
-All phases implemented without issues. Subagent-driven development worked smoothly.
-</attempted_approaches>
-
-<critical_context>
-## Architecture Decisions
-
-### Rust Extension
-1. **Module path:** `primordial._rust` (underscore prefix for internal)
-2. **PyO3 version:** 0.22 (not 0.20 as originally planned - needed for Python 3.13)
-3. **Distance normalization:** 0.0 = far, 1.0 = close (inverted from raw raycast)
-4. **GIL release:** `py.allow_threads()` during parallel work
-5. **Fallback:** Graceful degradation to Python if Rust unavailable
-6. **Spatial grid:** Implemented but not integrated (reserved for >500 entities)
-
-### Learning System
-1. **Multi-task prediction:** Both sensory AND reward prediction
-2. **Reward modulation:** Scales gradients, not loss (effective_lr = base_lr * modulation)
-3. **EMA inference:** Use shadow weights for stable predictions, train weights for updates
-4. **Death handling:** Save checkpoint, reset optimizer momentum, reduce LR by 0.5x
-5. **Reward history:** O(1) dict lookup for reward retrieval, handles stale predictions
-
-## Key Files Reference
-
-| File | Purpose |
-|------|---------|
-| `rust/src/raycast.rs` | Core ray-circle intersection |
-| `rust/src/batch.rs` | Parallel batch processing |
-| `primordial/world/helpers_rust.py` | Rust-accelerated vision |
-| `primordial/learning/learning_loop.py` | Main learning loop |
-| `primordial/learning/rewards.py` | All reward components |
-| `primordial/config/learning_config.yaml` | Hyperparameters |
-
-## Environment
-
-- Python 3.13.3
-- PyTorch 2.0+
-- Rust 1.90.0 (via rustup)
-- Maturin 1.10.2
-- Working directory: `/Users/zachswift/projects/kung-foo-chick-pea-feeble`
-- Git remote: `git@github.com:zachswift615/primordial.git`
-
-## Build Commands
-
-```bash
-# Rebuild Rust extension after changes
-maturin build --release
-pip install target/wheels/*.whl --force-reinstall
-cp ~/.pyenv/versions/3.13.3/lib/python3.13/site-packages/primordial/_rust.cpython-313-darwin.so primordial/
-
-# Run all tests
-python -m pytest primordial/tests/ -v
-
-# Run specific test suites
-python -m pytest primordial/tests/test_rust*.py -v      # Rust tests
-python -m pytest primordial/tests/learning/ -v          # Learning tests
-```
-</critical_context>
-
 <current_state>
-## Deliverables Status
+## Test Suite
+```
+651 tests passing (118.83s)
+- world: 275 tests
+- lrn: 185 tests
+- agents: 83 tests
+- learning: 61 tests
+- interface: 41 tests
+- rust: 6 tests
+```
 
-| Component | Status | Tests |
-|-----------|--------|-------|
-| **LRN Architecture** | COMPLETE | 185 |
-| **World System** | COMPLETE | 275 |
-| **Agent Body** | COMPLETE | 83 |
-| **Rust Optimization** | COMPLETE | 6 |
-| **Learning System** | COMPLETE | 61 |
-| **Human Interface** | NOT STARTED | 0 |
+## Files Modified This Session
+```
+primordial/interface/
+├── __init__.py (exports)
+├── config.py
+├── teaching_signals.py
+├── audio_capture.py
+├── input_handler.py
+├── demo_mode.py
+├── ui_panels.py
+├── renderer.py
+└── app.py
+
+primordial/__main__.py (CLI entry)
+primordial/plans/06-integration-and-experiments.md
+```
 
 ## Git Status
-
 ```
 Branch: main
-Latest commit: f963318 feat(learning): implement online learning system (Phases 1-3)
-Total commits: 24
-Remote: Pushed to origin
-Status: Clean
-```
-
-## Test Summary
-
-```
-610 tests passing
-├── LRN: 185 tests
-├── World: 275 tests
-├── Agents: 83 tests
-├── Rust: 6 tests
-└── Learning: 61 tests
-```
-
-## Performance Metrics
-
-| Metric | Value |
-|--------|-------|
-| Rust vision speedup | 10.9x |
-| Rust throughput | 715M ray casts/sec |
-| Python vision | 1.56ms/agent |
-| Rust vision | 0.14ms/agent |
-| Target 100 agents @ 60Hz | ACHIEVABLE |
-
-## Recommended Next Session Start
-
-```
-I'm continuing the Primordial project. Current status:
-- LRN Architecture: COMPLETE (185 tests)
-- World System: COMPLETE (275 tests)
-- Agent Body: COMPLETE (83 tests)
-- Rust Optimization: COMPLETE (6 tests, 10.9x speedup)
-- Learning System: COMPLETE (61 tests)
-- Total: 610 tests passing
-
-Next step: Execute the Human Interface plan.
-
-The plan at primordial/plans/05-human-interface.md needs to be reviewed
-and executed. It creates the Pygame-based visualization, agent camera view,
-teaching interface (reward/punish buttons), and metrics dashboard.
-
-Start with Phase 1: Core rendering with Pygame.
+Commits this session: 12
+All changes pushed to origin
 ```
 </current_state>
+
+<next_steps>
+## Recommended: Execute Integration Plan
+
+The next step is to execute `primordial/plans/06-integration-and-experiments.md`.
+
+### Quick Start
+```bash
+# Open plan and execute
+cat primordial/plans/06-integration-and-experiments.md | head -50
+```
+
+### Use Skill
+```
+Use superpowers:executing-plans to implement primordial/plans/06-integration-and-experiments.md
+```
+
+### What Gets Built
+1. **Simulation module** - Orchestrates World + AgentBody + LRN + LearningLoop
+2. **Experiments** - Automated experiments to validate success criteria
+3. **CLI** - `python -m primordial experiment survival`
+
+### After Integration
+Once integration is complete:
+1. Run experiments to validate success criteria
+2. Tune hyperparameters based on results
+3. Iterate on learning system if criteria not met
+</next_steps>
+
+<gotchas>
+## Dependencies
+- `pygame` and `sounddevice` already installed
+- All 651 tests passing
+
+## Interface Notes
+- Audio capture requires microphone permissions on macOS
+- Controller support auto-detects connected gamepads
+- Pygame warning about deprecated pkg_resources (safe to ignore)
+
+## LRN Model
+- Input shapes: vision(32,4), audio(100,2), proprio(7), touch(8)
+- Output: predictions(343), reward_preds(5), actions(5)
+- ~800K parameters
+</gotchas>
