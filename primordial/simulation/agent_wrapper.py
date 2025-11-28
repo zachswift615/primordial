@@ -257,9 +257,24 @@ class AgentWrapper:
     def save_checkpoint(self, path: str) -> None:
         """Save agent state and model."""
         import json
+        import numpy as np
+
+        def convert_to_native_types(obj):
+            """Recursively convert numpy types to native Python types."""
+            if isinstance(obj, dict):
+                return {k: convert_to_native_types(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [convert_to_native_types(item) for item in obj]
+            elif isinstance(obj, (np.integer, np.floating)):
+                return obj.item()
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            else:
+                return obj
 
         # Save agent state
         agent_data = self.agent.save()
+        agent_data = convert_to_native_types(agent_data)
         with open(f"{path}_agent.json", 'w') as f:
             json.dump(agent_data, f)
 
