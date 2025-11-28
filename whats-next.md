@@ -1,290 +1,296 @@
-# Session Handoff: Primordial LRN Development
+# Session Handoff: Primordial World System Complete
 
-**Created:** 2025-11-27
+**Created:** 2025-11-28
 **Purpose:** Enable continuation in a fresh context with complete precision
 
 ---
 
 <original_task>
-Continue executing the LRN architecture implementation plan from `primordial/plans/03-lrn-architecture.md`. The previous session completed the Fourier mixing prototype validation. This session was to:
+Continue executing the Primordial implementation plans. The previous session completed all 10 phases of the LRN architecture (185 tests). This session was to:
 
-1. Push the repository to GitHub (`git@github.com:zachswift615/primordial.git`)
-2. Build the full Living Resonance Network (LRN) architecture following Phases 1-10 of the implementation plan
-3. Complete all phases before context exhaustion, leaving room for handoff
+1. Build the World System following `primordial/plans/01-world-system.md`
+2. Implement all 7 phases: geometry, entities, physics, spatial grid, sound, environment, integration
+3. Create comprehensive tests and integration helpers for agent/renderer
 
-The LRN is a Fourier-based neural architecture (alternative to transformers) for embodied AI agents, using O(n log n) FFT operations instead of O(n²) attention.
+The World System provides the 2D physics simulation environment where agents live, eat food, avoid predators, and learn.
 </original_task>
 
 <work_completed>
-## All 10 Phases of LRN Architecture - COMPLETE
+## All 7 Phases of World System - COMPLETE
 
 ### Phase 1: Foundation
-**Commit:** `295a959` - feat(lrn): add full LRNConfig with all architecture parameters
+**Commit:** `49e7be0` - feat(world): implement complete World System (Phases 1-7)
 
-- Created `primordial/lrn/lrn_config.py` (65 lines)
-- Full `LRNConfig` dataclass with 21 parameters:
-  - Input dimensions: vision_shape=(32,4), audio_shape=(100,2), proprio_dim=7, touch_dim=8
-  - Architecture: hidden_dim=128, num_mixing_layers=6
-  - Encoder seq lengths: vision=32, audio=100, proprio=16, touch=16
-  - Heads: pred_hidden_dim=256, action_hidden_dim=128, action_dim=5
-  - Reward: reward_horizon=5, reward_loss_weight=1.0
-  - FFT: use_real_fft=True, spectral_dropout=0.0
-  - Genome: genome_dim=100, use_genome_modulation=True
-- Computed properties: total_seq_len=164, freq_bins=83, total_sensory_dim=343
-- Tests: `test_lrn_config.py` (11 tests)
+- Created `primordial/world/geometry.py` (200 lines):
+  - `Vec2` - 2D vector with full math ops (add, sub, mul, div, dot, cross, normalize, rotate, angle)
+  - `Circle` - collision shape with intersection, distance, overlap calculations
+  - `AABB` - axis-aligned bounding box for spatial partitioning
+- Tests: `test_geometry.py` (57 tests)
 
-**Commit:** `401518e` - feat(lrn): add FFT utilities with spectral bias initialization
+- Created `primordial/world/entities/base.py` (150 lines):
+  - `EntityType` enum: AGENT, FOOD, PREDATOR, VEGETATION, WATER
+  - `Entity` abstract base class with physics properties
+  - Methods: `apply_force()`, `apply_impulse()`, `distance_to()`, `direction_to()`
+- Tests: `test_entity.py` (18 tests)
 
-- Created `primordial/lrn/utils.py` with:
-  - `init_spectral_filter(seq_len, freq_bins)` - low-frequency biased initialization
-  - `complex_to_real()` / `real_to_complex()` - tensor conversion helpers
-- Spectral bias: decay = exp(-freq / (freq_bins / 4)), ~50x larger low vs high freq
-- Refactored `mixing.py` to use shared utility
-- Tests: `test_utils.py` (17 tests)
+- Created `primordial/world/physics.py` (230 lines):
+  - `PhysicsEngine` with Semi-Implicit Euler integration
+  - Collision detection (circle-circle)
+  - Collision resolution (separation + impulse)
+  - World boundary enforcement with bounce
+  - Raycasting for vision system
+- Tests: `test_physics.py` (28 tests)
 
-### Phase 2: Encoders
-**Commit:** `17de352` - feat(lrn): add modality encoders (vision, audio, proprio, touch)
+### Phase 2: Entities
+- Created `primordial/world/entities/vegetation.py`:
+  - Static obstacles that block movement and vision
+  - `blocks_vision()` method for raycast filtering
 
-- Created `primordial/lrn/encoders.py` (119 lines):
-  - `WaveletEncoder` - abstract base class
-  - `VisionEncoder`: (B, 32, 4) → (B, 32, 128) - linear projection per ray
-  - `AudioEncoder`: (B, 100, 2) → (B, 100, 128) - linear projection per sample
-  - `ProprioEncoder`: (B, 7) → (B, 16, 128) - expand to sequence via reshape
-  - `TouchEncoder`: (B, 8) → (B, 16, 128) - expand to sequence via reshape
-- Tests: `test_encoders.py` (22 tests)
+- Created `primordial/world/entities/water.py`:
+  - Static water barriers with ambient sound
+  - `get_sound_properties()` for sound system integration
 
-### Phase 3: Core Mixing
-**Commit:** `68c16af` - feat(lrn): add LRNFourierMixingLayer for full architecture
+- Created `primordial/world/entities/food.py`:
+  - Static food that gives energy when consumed
+  - `consume()` method deactivates and returns energy value
+  - Emits subtle ambient sound
 
-- Created `primordial/lrn/lrn_mixing.py` (123 lines):
-  - `LRNFourierMixingLayer` - uses LRNConfig with total_seq_len=164
-  - Spectral dropout support (phase-preserving)
-  - Configurable activation: gelu/relu/swish
-  - Uses shared `init_spectral_filter` utility
-- Tests: `test_lrn_mixing.py` (15 tests)
+- Created `primordial/world/entities/predator.py` (200 lines):
+  - `PredatorState` enum: PATROLLING, CHASING, RETURNING
+  - Full AI state machine with patrol/chase/return behavior
+  - Agent detection within configurable radius
+  - Attack system with cooldown and damage
+  - Growling sound while chasing
+- Tests: `test_entities.py` (34 tests)
 
-**Commit:** `98ad23d` - feat(lrn): add GenomeModulator for agent individuality
+### Phase 3: Collision & Spatial
+- Created `primordial/world/spatial_grid.py` (180 lines):
+  - Grid-based spatial partitioning for O(1) average-case queries
+  - `insert()`, `remove()`, `clear()` for entity management
+  - `query_radius()` - find entities within distance
+  - `query_point()` - find entities at a point
+  - `query_aabb()` - find entities in bounding box
+  - `get_potential_collisions()` - broad-phase collision detection
+- Tests: `test_spatial_grid.py` (24 tests)
 
-- Created `primordial/lrn/genome.py` (55 lines):
-  - `GenomeModulator` - affine transformation: x * scale + shift
-  - Scale constrained to [0.5, 1.5] for stability
-  - Genome projection: Linear(100, 128) → Tanh
-- Tests: `test_genome.py` (12 tests)
+### Phase 4: Sound System
+- Created `primordial/world/sound/sound_source.py`:
+  - `SoundSource` dataclass for sound emitters
 
-### Phase 4: Output Heads
-**Commit:** `bc6884e` - feat(lrn): add output heads (PredictionHead, LRNRewardHead, ActionHead)
+- Created `primordial/world/sound/sound_system.py` (200 lines):
+  - Distance attenuation (exponential decay)
+  - Stereo positioning based on listener orientation
+  - `compute_sound_at_position()` - returns (left, right) intensities
+  - `get_frequency_spectrum()` - for neural network input
+  - `get_loudest_direction()` - for audio navigation
+  - `get_total_intensity()` - overall volume
+- Tests: `test_sound.py` (30 tests)
 
-- Created `primordial/lrn/lrn_heads.py` (155 lines):
-  - `PredictionHead`: (B, 384) → (B, 343) with `split_prediction()` method
-  - `LRNRewardHead`: (B, 384) → (B, 5) reward predictions
-  - `ActionHead`: (B, 384) → (B, 5) action outputs
-- All heads take pooled input (3 * hidden_dim = 384)
-- Tests: `test_lrn_heads.py` (19 tests)
+### Phase 5: Environment & World
+- Created `primordial/world/environment.py` (130 lines):
+  - Sinusoidal day/night cycle
+  - Configurable day length, min/max brightness
+  - `is_daytime()` / `is_nighttime()` detection
+  - Time skip methods (dawn, noon, dusk, midnight)
+- Tests: `test_environment.py` (29 tests)
 
-### Phase 5: Integration
-**Commit:** `041d36f` - feat(lrn): add LivingResonanceNetwork main architecture
+- Created `primordial/world/world.py` (350 lines):
+  - `World` class orchestrating all systems
+  - Entity management: `add_entity()`, `remove_entity()`, `get_entity()`
+  - `get_entities_in_radius()` via spatial grid
+  - `tick()` - main simulation loop:
+    1. Update environment
+    2. Update food spawning
+    3. Update all entities (call entity.update())
+    4. Run physics step
+    5. Rebuild spatial grid
+    6. Update sound sources
+  - `setup_default_world()` - procedural generation:
+    - 15 vegetation clusters (3-8 plants each)
+    - 5 water bodies
+    - 3 predators
+    - 10 initial food items
+- Tests: `test_world.py` (28 tests)
 
-- Created `primordial/lrn/architecture.py` (200 lines):
-  - `LivingResonanceNetwork` - main model class
-  - Integrates: 4 encoders → concat → 6 mixing layers → pooling → 3 heads
-  - Pooling: mean + max + last → (B, 384)
-  - `compute_loss()` - multi-task loss (sensory + reward)
-  - `_init_weights()` - spectral bias initialization
-- Parameter count: 508,273 (~508K)
-- Tests: `test_architecture.py` (17 tests)
+### Phase 6: Testing
+- Comprehensive test coverage across all components
+- Integration tests verifying multi-system interactions
+- Performance validated at ~2ms per tick (well under 16.67ms for 60 FPS)
 
-### Phase 6: Genome Integration
-(Completed as part of Phase 3 - GenomeModulator)
-- Optional genome modulation via config flag
-- Applied after encoder concatenation, before mixing layers
-
-### Phase 7: Online Learning
-**Commit:** `0d71f16` - feat(lrn): add online learning utilities (Phase 7)
-
-- Created `primordial/lrn/learning.py` (407 lines):
-  - `RewardHistoryBuffer` - O(1) reward lookup, stale cleanup, on_death()
-  - `GradientClipper` - norm/value clipping, returns grad_norm
-  - `ExponentialMovingAverage` - shadow weights, apply/restore
-  - `GradientMonitor` - gradient statistics, stability detection
-  - `OnlineLRScheduler` - linear warmup + exponential decay
-- Tests: `test_learning.py` (40 tests)
-
-### Phase 8: Examples & Documentation
-**Commit:** `70f548c` - feat(lrn): add demo and profiling scripts (Phase 8)
-
-- Created `primordial/lrn/demo.py` (173 lines):
-  - Run: `python -m primordial.lrn.demo`
-  - Shows: config creation, forward pass, loss computation, training step
-- Created `primordial/lrn/profiling.py` (248 lines):
-  - Run: `python -m primordial.lrn.profiling`
-  - Benchmarks: forward/backward timing, memory usage, batch sizes 1 & 8
-
-### Phase 9: Validation
-**Commit:** `181e73a` - test(lrn): add comprehensive validation tests (Phase 9)
-
-- Created `primordial/tests/lrn/test_lrn_validation.py` (744 lines):
-  - `test_full_forward_backward_cycle` - complete training loop
-  - `test_online_learning_simulation` - 100 steps, batch_size=1
-  - `test_multi_task_learning_reduces_both_losses` - 500 steps
-  - `test_gradient_stability_extended` - 1000 steps, no NaN/Inf
-  - `test_memory_stability` - 500 steps, bounded growth
-  - `test_all_components_integrated` - LRN + all utilities
-  - Plus 5 more validation tests
-- Tests: 11 comprehensive integration tests
-
-### Phase 10: Optimization
-**Commit:** `19c1e99` - perf(lrn): add torch.compile support and inference mode (Phase 10)
-
-- Updated `architecture.py`:
-  - Added `compile` parameter to constructor
-  - `_forward_impl()` method for compilation
-  - `inference_mode()` context manager (no_grad + eval)
-- Updated `profiling.py`:
-  - Benchmarks compiled vs non-compiled
-  - Reports speedup (~1.02-1.03x on CPU)
-- Tests: 6 new tests for compile and inference_mode
+### Phase 7: Integration Helpers
+- Created `primordial/world/helpers.py` (300 lines):
+  - `get_vision_input()` - cast vision rays, returns (num_rays, 4) array
+  - `get_sound_input()` - stereo + frequency spectrum
+  - `get_touch_input()` - 8-direction proximity sensing
+  - `get_render_data()` - all data needed for visualization
+- Tests: `test_helpers.py` (27 tests)
 
 ## Summary Statistics
-- **Total commits this session:** 14
-- **Total tests:** 185 (all passing)
-- **Test execution time:** ~112 seconds
-- **Model parameters:** 508,273 (~508K)
-- **Forward pass:** ~1.8ms (batch=1), ~9ms (batch=8)
+- **Commits this session:** 1 (all phases in single commit)
+- **Total tests:** 460 (185 LRN + 275 World)
+- **Test execution time:** ~114 seconds
+- **Files created:** 52 new files
+- **Lines of code:** ~7,000 new lines
 - **Repository:** Pushed to `git@github.com:zachswift615/primordial.git`
 </work_completed>
 
 <work_remaining>
+## World System: COMPLETE
 ## LRN Architecture: COMPLETE
 
-All 10 phases of the LRN architecture implementation plan are done.
+All phases of both major systems are done.
 
-## Next Major Tasks (from other plans)
+## Next Major Tasks (from plans)
 
-### 1. Learning System Integration (04-learning-system.md)
-The dependency-free utilities are done. Remaining items need World/Agent:
-- `SurvivalRewards` class - needs AgentState (health, energy, events)
+### 1. Agent Body (02-agent-body.md) - RECOMMENDED NEXT
+Connect sensors and actuators to the World and LRN:
+- `Agent` entity class (extends Entity with health, energy)
+- Sensor implementations:
+  - Vision: Use `get_vision_input()` helper
+  - Audio: Use `get_sound_input()` helper
+  - Proprioception: velocity, angular velocity
+  - Touch: Use `get_touch_input()` helper
+- Actuator implementations:
+  - Thrust: forward/backward force
+  - Torque: rotation
+  - Vocalize: emit sound
+  - Eat: consume nearby food
+- `AgentState` class tracking health, energy, position, velocity
+- Integration with LRN for perception → action
+
+### 2. Learning System Integration (04-learning-system.md)
+Connect LRN to live agent in world:
+- `SurvivalRewards` class - health, energy, death events
 - `HumanTeaching` class - reward/punish button handling
 - `RewardCombiner` - combines survival + teaching rewards
 - `RewardModulatedOptimizer` - gradient scaling by reward
 - `OnlineLearningLoop` - full training loop integration
 - `DeathHandler` - checkpoint on death, optimizer reset
-- Integration tests with actual agent/world interaction
 
-### 2. World System (01-world-system.md)
-- 2D physics simulation (Box2D or custom)
-- Food sources and spawning
-- Damage/death mechanics
-- Raycasting for vision
-- Audio propagation
-- Collision detection
-
-### 3. Agent Body (02-agent-body.md)
-- Sensor implementations (vision rays, audio, proprioception, touch)
-- Actuator implementations (thrust, torque, vocalize, eat)
-- AgentState class (health, energy, position, velocity)
-- Body physics integration
-
-### 4. Human Interface (05-human-interface.md)
-- Pygame or similar visualization
-- Real-time agent observation
-- Teaching interface (reward/punish buttons)
-- Metrics dashboard
+### 3. Human Interface (05-human-interface.md)
+Pygame visualization and teaching:
+- Real-time world rendering using `get_render_data()`
+- Agent camera view
+- Teaching interface (reward/punish buttons, keyboard shortcuts)
+- Metrics dashboard (health, energy, rewards, loss)
+- Multi-agent support
 
 ## Recommended Order
-1. **World System** - establishes physics and environment
-2. **Agent Body** - connects sensors/actuators to world
-3. **Learning System Integration** - connects LRN to agent
-4. **Human Interface** - visualization and teaching
+1. **Agent Body** - creates the agent that lives in the world
+2. **Learning System Integration** - connects LRN brain to agent body
+3. **Human Interface** - allows observation and teaching
 </work_remaining>
 
 <attempted_approaches>
 ## What Worked Well
 
 1. **Subagent-Driven Development**
-   - Fresh subagent per task prevented context pollution
-   - Code review after each task caught no issues (all implementations were correct)
-   - Parallel task execution when possible
+   - Used parallel subagents for World class + tests simultaneously
+   - Used subagent for integration helpers
+   - Fresh context per task prevented confusion
+   - All subagent work succeeded first try
 
 2. **Plan-First Approach**
-   - `03-lrn-architecture.md` provided complete specifications
+   - `01-world-system.md` provided complete specifications
    - Code snippets in plan enabled accurate implementation
    - Phase ordering was logical and dependency-aware
 
-3. **TDD with Comprehensive Tests**
-   - 185 tests covering all components
-   - Tests caught edge cases during implementation
-   - Validation tests confirmed multi-task learning works
+3. **Batched Execution**
+   - Batch 1: Geometry, Entity base, Physics (103 tests)
+   - Batch 2: Entities (Vegetation, Water, Food, Predator) (137 tests)
+   - Batch 3: SpatialGrid, Sound, Environment (220 tests)
+   - Batch 4: World class, Integration helpers (275 tests)
+
+4. **TDD Throughout**
+   - Wrote tests alongside implementation
+   - Tests caught one bug in spatial grid test (wrong test assertion, not code bug)
+   - All 275 world tests pass
 
 ## No Significant Issues Encountered
 
-The implementation proceeded smoothly with all tests passing. Key decisions:
+The implementation proceeded smoothly. Key decisions:
 
-1. **Kept prototype code** - Original `FourierMixingLayer` and `PrototypeConfig` preserved for backward compatibility
+1. **Separate files per entity type** - Vegetation, Water, Food, Predator each in own file for clarity
 
-2. **New files for LRN** - Created `lrn_config.py`, `lrn_mixing.py`, `lrn_heads.py` to avoid conflicts
+2. **DummyEntity for testing** - Created concrete test entities to test abstract Entity base class
 
-3. **508K parameters** - Under the 800K target but validated as sufficient through testing
+3. **Spatial grid rebuilds each tick** - Simple approach that works well at current scale
 
-4. **torch.compile speedup modest** - ~2-3% on CPU due to FFT operations; would be better on GPU
+4. **Sound system attenuation** - Used exponential decay (e^(-k*d)) for realistic falloff
 </attempted_approaches>
 
 <critical_context>
 ## Architecture Decisions
 
-1. **Spectral filter shape**: `(seq_len, freq_bins, 2)` NOT `(hidden_dim, freq_bins, 2)`
-   - Filter indexed by sequence position
-   - Slicing logic handles hidden_dim ≠ seq_len
+### World System
+1. **Coordinate system**: Origin at bottom-left, +X right, +Y up
+2. **Physics integration**: Semi-Implicit Euler (v += a*dt, then p += v*dt)
+3. **Collision resolution**: Impulse-based with restitution coefficient
+4. **Spatial grid cell size**: 100 units (world is 1000x1000)
+5. **Sound attenuation**: `intensity * exp(-0.002 * distance)`
 
-2. **Spectral bias initialization**: `decay = exp(-freq / (freq_bins / 4))`
-   - Low frequencies ~50x larger than high frequencies
-   - Critical for stable learning
+### Entity System
+1. **Entity ID assignment**: World assigns sequential IDs via `next_entity_id`
+2. **Inactive entities**: Remain in storage but excluded from queries/physics
+3. **Type-specific tracking**: Separate lists for agents, food, predators, static entities
 
-3. **Multi-task loss**: `total = sensory_loss + reward_loss_weight * reward_loss`
-   - Default weight 1.0 (equal weighting)
-   - Both losses contribute to representation learning
+### Predator AI
+1. **Detection radius**: 200 units
+2. **Chase abandon distance**: 300 units from patrol center
+3. **Attack cooldown**: 1 second
+4. **Damage**: 20 per attack
+5. **Growling**: Only while in CHASING state
 
-4. **Pooling strategy**: mean + max + last token → (B, 3*hidden_dim)
-   - Captures different aspects of sequence
-   - Provides rich input to output heads
-
-5. **Action head not in loss**: Actions are raw logits, will be trained via RL later
+### Integration Helpers
+1. **Vision rays**: Returns (num_rays, 4) with [distance, type, r, g]
+2. **Entity type encoding**: 0=nothing, 1=food, 2=predator, 3=vegetation, 4=water, 5=agent
+3. **Touch directions**: 8 directions (N, NE, E, SE, S, SW, W, NW)
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `primordial/lrn/lrn_config.py` | Full architecture config |
-| `primordial/lrn/architecture.py` | LivingResonanceNetwork main class |
-| `primordial/lrn/encoders.py` | All 4 modality encoders |
-| `primordial/lrn/lrn_mixing.py` | LRNFourierMixingLayer |
-| `primordial/lrn/lrn_heads.py` | Prediction, Reward, Action heads |
-| `primordial/lrn/genome.py` | GenomeModulator |
-| `primordial/lrn/learning.py` | Online learning utilities |
-| `primordial/lrn/utils.py` | FFT utilities |
-| `primordial/lrn/demo.py` | Standalone demo script |
-| `primordial/lrn/profiling.py` | Performance benchmarking |
+| `primordial/world/world.py` | Main World class orchestrating simulation |
+| `primordial/world/geometry.py` | Vec2, Circle, AABB primitives |
+| `primordial/world/physics.py` | PhysicsEngine with collision and raycasting |
+| `primordial/world/spatial_grid.py` | SpatialGrid for efficient queries |
+| `primordial/world/environment.py` | Day/night cycle |
+| `primordial/world/sound/` | SoundSystem and SoundSource |
+| `primordial/world/entities/` | All entity types |
+| `primordial/world/helpers.py` | Integration helpers for agent/renderer |
+| `primordial/world/__init__.py` | Exports all public API |
 
 ## Environment
 
 - Python 3.13.3
-- PyTorch 2.0+ (uses torch.fft, torch.compile)
+- PyTorch 2.0+ (for LRN)
+- NumPy (for World randomization)
 - Working directory: `/Users/zachswift/projects/kung-foo-chick-pea-feeble`
 - Git repo: `git@github.com:zachswift615/primordial.git`
 
 ## Commands to Verify
 
 ```bash
-# Run all LRN tests
+# Run all tests
+python -m pytest primordial/tests/ -v
+
+# Run World tests only
+python -m pytest primordial/tests/world/ -v
+
+# Run LRN tests only
 python -m pytest primordial/tests/lrn/ -v
 
-# Run demo
-python -m primordial.lrn.demo
-
-# Run profiling
-python -m primordial.lrn.profiling
-
-# Run prototype validation (from previous session)
-python -m primordial.lrn.train
+# Quick test of World
+python -c "
+from primordial.world import World, Vec2
+world = World()
+world.setup_default_world()
+for _ in range(100):
+    world.tick()
+print(f'Brightness: {world.brightness:.2f}')
+print(f'Food items: {len(world.food_items)}')
+print(f'Predators: {len(world.predators)}')
+"
 ```
 </critical_context>
 
@@ -293,25 +299,30 @@ python -m primordial.lrn.train
 
 | Component | Status |
 |-----------|--------|
+| **LRN Architecture** | **COMPLETE** |
 | LRNConfig | COMPLETE |
-| FFT utilities | COMPLETE |
 | Encoders (4) | COMPLETE |
 | LRNFourierMixingLayer | COMPLETE |
 | GenomeModulator | COMPLETE |
 | Output Heads (3) | COMPLETE |
 | LivingResonanceNetwork | COMPLETE |
 | Online Learning Utilities | COMPLETE |
-| Demo & Profiling Scripts | COMPLETE |
-| Validation Tests | COMPLETE |
-| torch.compile Support | COMPLETE |
-| **LRN Architecture (all phases)** | **COMPLETE** |
+| **World System** | **COMPLETE** |
+| Geometry (Vec2, Circle, AABB) | COMPLETE |
+| Entity base + types | COMPLETE |
+| PhysicsEngine | COMPLETE |
+| SpatialGrid | COMPLETE |
+| SoundSystem | COMPLETE |
+| Environment | COMPLETE |
+| World class | COMPLETE |
+| Integration Helpers | COMPLETE |
 
 ## Git Status
 
 ```
 Branch: main
-Latest commit: 19c1e99 perf(lrn): add torch.compile support and inference mode (Phase 10)
-Total commits this session: 14
+Latest commit: 49e7be0 feat(world): implement complete World System (Phases 1-7)
+Total commits: 16 (14 LRN + 1 handoff + 1 World)
 Remote: Pushed to origin (github.com:zachswift615/primordial.git)
 Status: Clean (all changes committed and pushed)
 ```
@@ -319,34 +330,35 @@ Status: Clean (all changes committed and pushed)
 ## Test Status
 
 ```
-185 tests passing
+460 tests passing (185 LRN + 275 World)
 0 tests failing
-Execution time: ~112 seconds
-Coverage: All LRN components
+Execution time: ~114 seconds
+Coverage: All LRN and World components
 ```
 
 ## What's NOT Done
 
-- Learning system integration (needs World/Agent)
-- World system implementation
-- Agent body implementation
-- Human interface
+- Agent body implementation (02-agent-body.md)
+- Learning system integration (04-learning-system.md)
+- Human interface (05-human-interface.md)
 - Full embodied agent integration
 
 ## Recommended Next Session Start
 
 ```
-I'm continuing the Primordial project. The LRN architecture is COMPLETE
-(all 10 phases done, 185 tests passing).
+I'm continuing the Primordial project. Both major systems are COMPLETE:
+- LRN Architecture: 185 tests passing
+- World System: 275 tests passing (460 total)
 
-Next step: Build the World System using primordial/plans/01-world-system.md
+Next step: Build the Agent Body using primordial/plans/02-agent-body.md
 
-This establishes:
-- 2D physics simulation
-- Food/damage mechanics
-- The environment that generates rewards for agent learning
+This creates the Agent entity that:
+- Lives in the World (has health, energy, position)
+- Perceives via sensors (vision, audio, touch, proprioception)
+- Acts via actuators (thrust, torque, vocalize, eat)
+- Uses the LRN as its brain
 
-After World System, implement Agent Body (02-agent-body.md) to connect
-sensors/actuators to the LRN.
+After Agent Body, implement Learning System Integration (04-learning-system.md)
+to connect the LRN's online learning to survival rewards.
 ```
 </current_state>
