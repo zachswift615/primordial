@@ -23,6 +23,13 @@ if TYPE_CHECKING:
     from primordial.agents.genome import AgentGenome
     from primordial.world.world import World
 
+# Try to import Rust-accelerated helpers
+try:
+    from primordial.world.helpers_rust import get_vision_input_fast, RUST_AVAILABLE
+    _USE_RUST = RUST_AVAILABLE
+except ImportError:
+    _USE_RUST = False
+
 
 class VisionSensor:
     """Ray-based vision system.
@@ -51,6 +58,7 @@ class VisionSensor:
         position: Vec2,
         facing: Vec2,
         world: World,
+        ignore_entity_id: int | None = None,
     ) -> np.ndarray:
         """Cast vision rays and return sensory data.
 
@@ -60,6 +68,7 @@ class VisionSensor:
             position: Agent position in world coordinates.
             facing: Unit vector indicating facing direction.
             world: World instance to query.
+            ignore_entity_id: Entity ID to ignore (typically self).
 
         Returns:
             np.ndarray of shape (num_rays, 4) float32:
@@ -67,6 +76,22 @@ class VisionSensor:
                 - Column 1: entity_type code (0-5)
                 - Column 2-3: reserved for color (currently 0)
         """
+        # Try Rust-accelerated path first
+        if _USE_RUST:
+            try:
+                return get_vision_input_fast(
+                    world=world,
+                    agent_position=position,
+                    agent_facing=facing,
+                    vision_range=self.max_range,
+                    vision_fov=self.fov,
+                    num_rays=self.num_rays,
+                    ignore_entity_id=ignore_entity_id,
+                )
+            except Exception:
+                pass  # Fall through to Python
+
+        # Python fallback
         result = helpers.get_vision_input(
             world=world,
             agent_position=position,

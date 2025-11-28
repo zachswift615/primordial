@@ -320,7 +320,9 @@ class AgentBody(Entity):
                 'touch': (8,) array
         """
         return {
-            "vision": self.vision.sense(self.position, self.facing, world),
+            "vision": self.vision.sense(
+                self.position, self.facing, world, ignore_entity_id=self.id
+            ),
             "audio": self.audio.sense(self.position, self.facing, world),
             "proprioception": self.proprioception.sense(
                 energy=self.energy,

@@ -25,6 +25,7 @@ def get_vision_input(
     vision_range: float = 200.0,
     vision_fov: float = 2.094,  # 120 degrees in radians
     num_rays: int = 32,
+    ignore_entity_id: int | None = None,
 ) -> np.ndarray:
     """Cast vision rays from agent perspective.
 
@@ -38,6 +39,7 @@ def get_vision_input(
         vision_range: Maximum vision distance (default 200.0).
         vision_fov: Field of view in radians (default 2.094 = 120 degrees).
         num_rays: Number of rays to cast (default 32).
+        ignore_entity_id: Entity ID to ignore in raycasts (e.g., agent's own ID).
 
     Returns:
         Array of shape (num_rays, 4) containing:
@@ -78,7 +80,7 @@ def get_vision_input(
             direction=ray_direction,
             max_distance=vision_range,
             entities=all_entities,
-            ignore_entity_id=None,  # Could add agent ID here if needed
+            ignore_entity_id=ignore_entity_id,
         )
 
         # Normalize distance to [0, 1]
