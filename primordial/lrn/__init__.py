@@ -13,6 +13,7 @@ from .encoders import (
     ProprioEncoder,
     TouchEncoder,
 )
+from .genome import GenomeModulator
 
 __all__ = [
     "PrototypeConfig",
@@ -30,4 +31,5 @@ __all__ = [
     "AudioEncoder",
     "ProprioEncoder",
     "TouchEncoder",
+    "GenomeModulator",
 ]
