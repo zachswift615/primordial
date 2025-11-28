@@ -1,6 +1,7 @@
 """Wrapper combining AgentBody, LRN model, and OnlineLearningLoop."""
 
 from typing import Tuple, Dict, Any, Optional, List
+from dataclasses import dataclass
 import torch
 
 from primordial.agents.body import AgentBody
@@ -11,6 +12,17 @@ from primordial.lrn.lrn_config import LRNConfig
 from primordial.lrn.architecture import LivingResonanceNetwork
 from primordial.learning.learning_loop import OnlineLearningLoop
 from primordial.simulation.config import SimulationConfig
+
+
+@dataclass
+class SimpleAgentState:
+    """Simplified agent state for reward computation."""
+    health: float
+    max_health: float
+    energy: float
+    max_energy: float
+    is_alive: bool
+    is_eating: bool
 
 
 class AgentWrapper:
@@ -75,6 +87,7 @@ class AgentWrapper:
 
         # State tracking
         self.prev_senses = None
+        self.prev_modalities = None  # Store (vision, audio, proprio, touch)
         self.prev_agent_state = None
         self.step_count = 0
         self.events: List[str] = []
@@ -102,17 +115,20 @@ class AgentWrapper:
         touch = torch.from_numpy(observations['touch']).float().unsqueeze(0)
 
         # Current state for reward computation
-        current_state = {
-            'health': self.agent.health,
-            'energy': self.agent.energy,
-            'is_alive': self.agent.is_alive,
-            'is_eating': self.agent.is_eating,
-        }
+        current_state = SimpleAgentState(
+            health=self.agent.health,
+            max_health=self.agent.genome.max_health,
+            energy=self.agent.energy,
+            max_energy=self.agent.genome.max_energy,
+            is_alive=self.agent.is_alive,
+            is_eating=self.agent.is_eating,
+        )
 
         # 2. Think + Learn
         if self.learning_enabled and self.learning_loop is not None:
-            if self.prev_senses is not None:
-                # Create combined senses tensor for learning loop
+            if self.prev_modalities is not None:
+                # We have previous state - do learning
+                # Create combined senses tensor for loss computation
                 senses = torch.cat([
                     vision.flatten(1),
                     audio.flatten(1),
@@ -120,31 +136,62 @@ class AgentWrapper:
                     touch
                 ], dim=1)
 
-                prev_senses = self.prev_senses
-
                 # Collect events
                 events = self._collect_events(self.prev_agent_state, current_state)
 
-                # Learning step
-                action_tensor, prediction = self.learning_loop.step(
-                    senses=senses,
-                    prev_senses=prev_senses,
-                    agent_state=current_state,
-                    prev_agent_state=self.prev_agent_state,
-                    events=events
-                )
+                # Manual learning step (similar to OnlineLearningLoop but model-agnostic)
+                if self.learning_loop.prev_prediction is not None:
+                    # Compute prediction loss against current senses
+                    loss = self.learning_loop.loss_fn(self.learning_loop.prev_prediction, senses)
 
-                metrics['step'] = self.step_count
-            else:
-                # First step - just forward pass
+                    # Compute reward
+                    total_reward, _, _ = self.learning_loop.reward_combiner.compute_total_reward(
+                        self.prev_agent_state, current_state, events
+                    )
+
+                    # Backward pass
+                    self.learning_loop.optimizer.zero_grad()
+                    loss.backward()
+
+                    # Gradient clipping
+                    self.learning_loop.gradient_clipper.clip(self.model)
+
+                    # Reward-modulated optimizer step
+                    self.learning_loop.optimizer.step(total_reward)
+
+                    # Update EMA
+                    self.learning_loop.ema.update()
+
+                    # Learning rate schedule
+                    self.learning_loop.lr_scheduler.step()
+
+                    # Record metrics
+                    self.learning_loop.grad_monitor.record(self.model)
+
+                    metrics['step'] = self.step_count
+
+                # Compute new prediction for next step (with grad)
+                prediction, _, _ = self.model(vision, audio, proprio, touch)
+                self.learning_loop.prev_prediction = prediction
+                self.learning_loop.step_count += 1
+
+                # Get action using EMA weights
                 with torch.no_grad():
+                    self.learning_loop.ema.apply_shadow()
                     _, _, action_tensor = self.model(vision, audio, proprio, touch)
+                    self.learning_loop.ema.restore()
+            else:
+                # First step - compute prediction and action
+                prediction, _, action_tensor = self.model(vision, audio, proprio, touch)
+                self.learning_loop.prev_prediction = prediction
+                action_tensor = action_tensor.detach()  # No learning on first step
         else:
             # No learning - just inference
             with torch.no_grad():
                 _, _, action_tensor = self.model(vision, audio, proprio, touch)
 
         # Store for next step
+        self.prev_modalities = (vision, audio, proprio, touch)
         self.prev_senses = torch.cat([
             vision.flatten(1),
             audio.flatten(1),
@@ -178,8 +225,8 @@ class AgentWrapper:
 
     def _collect_events(
         self,
-        prev_state: Dict[str, Any],
-        current_state: Dict[str, Any]
+        prev_state: Optional[SimpleAgentState],
+        current_state: SimpleAgentState
     ) -> List[str]:
         """Collect events for reward computation."""
         events = []
@@ -188,16 +235,16 @@ class AgentWrapper:
             return events
 
         # Eating event
-        if current_state['is_eating'] and not prev_state['is_eating']:
-            events.append('eat')
+        if current_state.is_eating and not prev_state.is_eating:
+            events.append('ate_food')
 
         # Damage event
-        if current_state['health'] < prev_state['health']:
-            events.append('damage')
+        if current_state.health < prev_state.health:
+            events.append('took_damage')
 
         # Death event
-        if not current_state['is_alive'] and prev_state['is_alive']:
-            events.append('death')
+        if not current_state.is_alive and prev_state.is_alive:
+            events.append('died')
 
         return events
 
