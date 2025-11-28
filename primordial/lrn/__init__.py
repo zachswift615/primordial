@@ -15,6 +15,7 @@ from .encoders import (
     TouchEncoder,
 )
 from .genome import GenomeModulator
+from .architecture import LivingResonanceNetwork
 
 __all__ = [
     "PrototypeConfig",
@@ -36,4 +37,5 @@ __all__ = [
     "ProprioEncoder",
     "TouchEncoder",
     "GenomeModulator",
+    "LivingResonanceNetwork",
 ]
