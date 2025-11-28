@@ -4,6 +4,7 @@ from .lrn_config import LRNConfig
 from .mixing import FourierMixingLayer
 from .lrn_mixing import LRNFourierMixingLayer
 from .heads import SensoryHead, RewardHead
+from .lrn_heads import PredictionHead, LRNRewardHead, ActionHead
 from .prototype import FourierPrototype
 from .utils import init_spectral_filter, complex_to_real, real_to_complex
 from .encoders import (
@@ -22,6 +23,9 @@ __all__ = [
     "LRNFourierMixingLayer",
     "SensoryHead",
     "RewardHead",
+    "PredictionHead",
+    "LRNRewardHead",
+    "ActionHead",
     "FourierPrototype",
     "init_spectral_filter",
     "complex_to_real",
