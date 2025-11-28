@@ -22,3 +22,16 @@ def raycast_vision(
     entity_ids: NDArray[np.int32],
     ignore_entity_id: int | None = None,
 ) -> NDArray[np.float32]: ...
+
+def batch_raycast_vision(
+    agent_positions: NDArray[np.float32],
+    agent_angles: NDArray[np.float32],
+    agent_ids: NDArray[np.int32],
+    num_rays: int,
+    fov: float,
+    max_distance: float,
+    entity_positions: NDArray[np.float32],
+    entity_radii: NDArray[np.float32],
+    entity_types: NDArray[np.uint8],
+    entity_ids: NDArray[np.int32],
+) -> NDArray[np.float32]: ...

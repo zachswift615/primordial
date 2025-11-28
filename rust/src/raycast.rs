@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 /// IMPORTANT: Direction MUST be normalized (magnitude = 1.0).
 /// Returns distance to intersection or f32::MAX if no hit.
 #[inline]
-fn ray_circle_intersection(
+pub fn ray_circle_intersection(
     origin_x: f32, origin_y: f32,
     dir_x: f32, dir_y: f32,  // Must be normalized!
     center_x: f32, center_y: f32,
