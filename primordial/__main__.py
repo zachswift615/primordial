@@ -10,56 +10,52 @@ def main():
         description="Primordial - Human Teaching Interface for AI Agents"
     )
 
-    parser.add_argument(
-        "--fps",
-        type=int,
-        default=60,
-        help="Target frames per second (default: 60)"
-    )
+    subparsers = parser.add_subparsers(dest='command')
 
-    parser.add_argument(
-        "--zoom",
-        type=float,
-        default=1.0,
-        help="Initial zoom level (default: 1.0)"
+    # Interface command (default)
+    interface_parser = subparsers.add_parser(
+        'interface',
+        help='Run the teaching interface'
     )
+    interface_parser.add_argument('--fps', type=int, default=60)
+    interface_parser.add_argument('--width', type=int, default=960)
+    interface_parser.add_argument('--height', type=int, default=720)
+    interface_parser.add_argument('--no-audio', action='store_true')
 
-    parser.add_argument(
-        "--width",
-        type=int,
-        default=960,
-        help="Window width in pixels (default: 960)"
-    )
+    # Experiment command
+    from primordial.cli.run_experiment import add_experiment_parser, run_experiment_command
+    add_experiment_parser(subparsers)
 
-    parser.add_argument(
-        "--height",
-        type=int,
-        default=720,
-        help="Window height in pixels (default: 720)"
+    # Simulate command (headless)
+    sim_parser = subparsers.add_parser(
+        'simulate',
+        help='Run headless simulation'
     )
-
-    parser.add_argument(
-        "--no-audio",
-        action="store_true",
-        help="Disable audio capture"
-    )
+    sim_parser.add_argument('--steps', type=int, default=1000)
+    sim_parser.add_argument('--output', type=str, default=None)
 
     args = parser.parse_args()
 
-    # Import here to avoid pygame init on import
+    if args.command == 'experiment':
+        run_experiment_command(args)
+    elif args.command == 'simulate':
+        run_simulate(args)
+    elif args.command == 'interface' or args.command is None:
+        run_interface(args if args.command else parser.parse_args(['interface']))
+
+
+def run_interface(args):
+    """Run the teaching interface."""
     from primordial.interface.config import UIConfig
     from primordial.interface.app import TeachingApp
 
-    # Create config from args
     config = UIConfig()
     config.fps = args.fps
     config.window_width = args.width
     config.window_height = args.height
 
-    # Create and run app
     app = TeachingApp(config)
 
-    # Disable audio if requested
     if args.no_audio:
         app.audio_capture.stop()
 
@@ -69,6 +65,27 @@ def main():
         print("\nShutting down gracefully...")
         app.stop()
         sys.exit(0)
+
+
+def run_simulate(args):
+    """Run headless simulation."""
+    from primordial.simulation.simulation import Simulation
+    from primordial.simulation.config import SimulationConfig
+
+    config = SimulationConfig(render_enabled=False)
+    sim = Simulation(config)
+
+    print(f"Running simulation for {args.steps} steps...")
+    metrics = sim.run(args.steps)
+
+    print(f"\nCompleted {len(metrics)} steps")
+    print(f"Final agent survival times:")
+    for agent_id, wrapper in sim.agents.items():
+        print(f"  {agent_id}: {wrapper.agent.age:.2f}s")
+
+    if args.output:
+        sim.save_state(args.output)
+        print(f"\nState saved to: {args.output}")
 
 
 if __name__ == "__main__":
