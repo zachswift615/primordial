@@ -1,0 +1,49 @@
+# Online Learning System Configuration
+
+optimizer:
+  type: adamw
+  params:
+    lr: 1.0e-4
+    betas: [0.9, 0.999]
+    eps: 1.0e-8
+    weight_decay: 1.0e-5
+  lr_schedule:
+    warmup_steps: 1000
+    base_lr: 1.0e-4
+    min_lr: 1.0e-6
+    decay_rate: 0.9999
+
+loss:
+  type: mse
+
+reward:
+  combiner:
+    survival_weight: 1.0
+    teaching_weight: 1.5
+  modulation:
+    modulation_type: linear
+    reward_scale: 0.1
+    min_modulation: 0.1
+    max_modulation: 3.0
+
+stability:
+  clipping:
+    clip_type: norm
+    max_norm: 1.0
+  ema:
+    decay: 0.999
+  monitoring:
+    window_size: 100
+
+death:
+  checkpoint_dir: ./checkpoints
+  reset_optimizer: true
+  lr_reduction_factor: 0.5
+  min_lr: 1.0e-6
+
+metrics:
+  metrics:
+    log_interval: 10
+  viz:
+    use_tensorboard: true
+    use_wandb: false
