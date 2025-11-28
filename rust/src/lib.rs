@@ -2,6 +2,7 @@ use pyo3::prelude::*;
 
 mod geometry;
 mod raycast;
+mod spatial;
 
 /// Version for compatibility checking
 const VERSION: &str = "0.1.0";
