@@ -1239,8 +1239,8 @@ class CockpitApp:
         y += 22
 
         # Column headers
-        cols = ["#", "E", "H", "Age", "Gen", "Food"]
-        col_widths = [24, 36, 36, 48, 36, 36]
+        cols = ["#", "E", "H", "Age", "Gen", "Fd", "Ch"]
+        col_widths = [24, 36, 36, 48, 36, 36, 36]
         col_x = x
 
         pygame.draw.rect(self.screen, self.BG_DARK, pygame.Rect(x, y, width, 20))
@@ -1264,6 +1264,7 @@ class CockpitApp:
                 'age': agent.age,
                 'generation': wrapper.generation,
                 'food': wrapper.lifetime_stats.get('total_food_eaten', 0),
+                'offspring': wrapper.lifetime_stats.get('offspring_count', 0),
             })
 
         # Sort based on current sort key
@@ -1339,6 +1340,11 @@ class CockpitApp:
             # Food
             food = self.font_small.render(str(agent['food']), True, text_color)
             self.screen.blit(food, (col_x + 2, y + 2))
+            col_x += col_widths[5]
+
+            # Offspring
+            offspring = self.font_small.render(str(agent['offspring']), True, text_color)
+            self.screen.blit(offspring, (col_x + 2, y + 2))
 
             y += 22
 
