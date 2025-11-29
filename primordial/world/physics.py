@@ -104,6 +104,7 @@ class PhysicsEngine:
         """Check if two entities are colliding.
 
         Uses circle-circle intersection based on entity collision shapes.
+        Skips collisions between predators and food (predators pass through food).
 
         Args:
             a: First entity.
@@ -112,6 +113,13 @@ class PhysicsEngine:
         Returns:
             True if entities are colliding.
         """
+        from primordial.world.entities.base import EntityType
+
+        # Predators pass through food
+        if (a.entity_type == EntityType.PREDATOR and b.entity_type == EntityType.FOOD) or \
+           (a.entity_type == EntityType.FOOD and b.entity_type == EntityType.PREDATOR):
+            return False
+
         shape_a = a.get_collision_shape()
         shape_b = b.get_collision_shape()
         return shape_a.intersects(shape_b)

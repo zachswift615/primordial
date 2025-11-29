@@ -1,11 +1,11 @@
 """Main rendering engine for the teaching interface."""
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import pygame
 import numpy as np
 from primordial.interface.config import UIConfig
 from primordial.interface.ui_panels import (
-    HeaderPanel, WorldViewPanel, AgentPOVPanel,
+    HeaderPanel, WorldViewPanel, AgentPOVPanel, AgentTablePanel,
     StatusPanel, MetricsPanel, WaveformPanel, ControlsPanel
 )
 
@@ -38,6 +38,7 @@ class Renderer:
         self.header = HeaderPanel(config)
         self.world_view = WorldViewPanel(config)
         self.agent_pov = AgentPOVPanel(config)
+        self.agent_table = AgentTablePanel(config)
         self.status = StatusPanel(config)
         self.metrics = MetricsPanel(config)
         self.waveform = WaveformPanel(config)
@@ -68,7 +69,9 @@ class Renderer:
                     metrics: Dict[str, Any],
                     mode: str,
                     zoom: float = 1.0,
-                    offset: tuple = (0, 0)) -> None:
+                    offset: tuple = (0, 0),
+                    agents_table_data: Optional[List[Dict[str, Any]]] = None,
+                    selected_agent_id: Optional[str] = None) -> None:
         """
         Render complete frame with all panels.
 
@@ -81,6 +84,8 @@ class Renderer:
             mode: Current interaction mode
             zoom: World view zoom level
             offset: World view camera offset
+            agents_table_data: List of all agents' data for table display
+            selected_agent_id: Currently selected agent ID
         """
         # Clear screen
         self.screen.fill(self.config.colors.BACKGROUND)
@@ -88,7 +93,13 @@ class Renderer:
         # Render all panels
         self.header.render(self.screen, self.get_fps(), self.recording)
         self.world_view.render(self.screen, world_state, zoom, offset)
-        self.agent_pov.render(self.screen, agent_view)
+
+        # Use agent table if data provided, otherwise fall back to POV
+        if agents_table_data is not None:
+            self.agent_table.render(self.screen, agents_table_data, selected_agent_id)
+        else:
+            self.agent_pov.render(self.screen, agent_view)
+
         self.status.render(self.screen, agent_state, mode)
         self.metrics.render(self.screen, metrics)
         self.waveform.render(self.screen, waveform)

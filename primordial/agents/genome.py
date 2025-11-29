@@ -70,11 +70,11 @@ class AgentGenome:
     audio_range: float = 300.0
     touch_range: float = 15.0
 
-    # Metabolic parameters
-    base_energy_cost: float = 0.5
-    movement_energy_mult: float = 2.0
-    vocalize_energy_mult: float = 1.5
-    eating_efficiency: float = 0.8
+    # Metabolic parameters (reduced costs to give agents more time to learn)
+    base_energy_cost: float = 0.1  # 50% slower drain (was 0.2)
+    movement_energy_mult: float = 0.5  # 50% slower drain (was 1.0)
+    vocalize_energy_mult: float = 1.0  # Reduced from 1.5
+    eating_efficiency: float = 0.9  # Increased from 0.8 - get more from food
 
     # Health parameters
     max_health: float = 100.0
@@ -182,18 +182,19 @@ def create_default_genome() -> AgentGenome:
     return AgentGenome()
 
 
-def breed(parent1: AgentGenome, parent2: AgentGenome) -> AgentGenome:
+def breed(parent1: AgentGenome, parent2: AgentGenome, mutation_chance: float = 0.1) -> AgentGenome:
     """Create offspring genome from two parents.
 
-    Each trait is randomly inherited from either parent, then
-    mutation is applied to the result.
+    Each trait is randomly inherited from either parent. There's a chance
+    that mutation is applied to the result.
 
     Args:
         parent1: First parent genome.
         parent2: Second parent genome.
+        mutation_chance: Probability of applying mutation (default 10%).
 
     Returns:
-        New mutated child genome.
+        New child genome (possibly mutated).
     """
     # Start with copy of parent1
     child = copy.deepcopy(parent1)
@@ -203,5 +204,7 @@ def breed(parent1: AgentGenome, parent2: AgentGenome) -> AgentGenome:
         if random.random() < 0.5:
             setattr(child, f.name, getattr(parent2, f.name))
 
-    # Apply mutation
-    return child.mutate()
+    # 10% chance of mutation
+    if random.random() < mutation_chance:
+        return child.mutate()
+    return child

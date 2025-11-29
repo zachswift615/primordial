@@ -168,6 +168,17 @@ class SurvivalRewards:
     LOW_HEALTH = -0.05     # When health < 50%
     HEALTHY = +0.01        # When health > 80% and energy > 50%
 
+    # Exploration/curiosity rewards
+    MOVEMENT_BONUS = +0.02  # Small reward for moving (encourages exploration)
+    IDLE_PENALTY = -0.01    # Small penalty for staying still
+
+    # Breeding drive discomfort
+    HIGH_BREEDING_DRIVE = -0.03  # Periodic discomfort when drive > 0.7
+
+    # Social connection
+    LONELINESS_PENALTY = -0.02  # Discomfort when social connection is low
+    SOCIAL_BONUS = +0.01  # Small bonus for being with others
+
     @staticmethod
     def compute_reward(prev_state, current_state, events):
         """
@@ -199,6 +210,23 @@ class SurvivalRewards:
         if (current_state.health > 0.8 * current_state.max_health and
             current_state.energy > 0.5 * current_state.max_energy):
             reward += SurvivalRewards.HEALTHY
+
+        # Movement/exploration reward - encourage agent to move around
+        if hasattr(current_state, 'speed') and current_state.speed > 5.0:
+            reward += SurvivalRewards.MOVEMENT_BONUS
+        elif hasattr(current_state, 'speed') and current_state.speed < 1.0:
+            reward += SurvivalRewards.IDLE_PENALTY
+
+        # Breeding drive discomfort - high drive causes periodic negative sensation
+        if hasattr(current_state, 'breeding_drive') and current_state.breeding_drive > 0.7:
+            reward += SurvivalRewards.HIGH_BREEDING_DRIVE
+
+        # Social connection - loneliness hurts, being together feels good
+        if hasattr(current_state, 'social_connection'):
+            if current_state.social_connection < 0.3:
+                reward += SurvivalRewards.LONELINESS_PENALTY
+            elif current_state.social_connection > 0.7:
+                reward += SurvivalRewards.SOCIAL_BONUS
 
         return reward
 

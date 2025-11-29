@@ -1,6 +1,6 @@
 """Individual UI panel renderers."""
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import pygame
 import numpy as np
 from primordial.interface.config import UIConfig
@@ -14,6 +14,8 @@ class BasePanel:
         self.font = pygame.font.Font(None, config.font_size)
         self.font_small = pygame.font.Font(None, config.font_size_small)
         self.font_large = pygame.font.Font(None, config.font_size_large)
+        # Monospace font for tables
+        self.font_mono = pygame.font.SysFont('monospace', 16)
 
     def draw_panel_background(self, surface: pygame.Surface, rect: tuple) -> None:
         """Draw panel background."""
@@ -81,8 +83,8 @@ class WorldViewPanel(BasePanel):
         """Draw world entities."""
         import math
 
-        # Draw in order: food first, then predators, then agents on top
-        draw_order = {"food": 0, "predator": 1, "agent": 2}
+        # Draw in order: water/vegetation first (background), then food, predators, agents on top
+        draw_order = {"water": 0, "vegetation": 1, "food": 2, "predator": 3, "agent": 4}
         sorted_entities = sorted(entities, key=lambda e: draw_order.get(e.get("type"), 0))
 
         for entity in sorted_entities:
@@ -128,6 +130,34 @@ class WorldViewPanel(BasePanel):
                 pygame.draw.polygon(surface, color, points)
                 pygame.draw.polygon(surface, (255, 100, 100), points, 2)
 
+            elif entity_type == "vegetation":
+                color = self.config.colors.VEGETATION
+                radius = max(6, int(entity_radius * zoom))
+                # Draw vegetation as irregular polygon (bush shape)
+                num_points = 7
+                points = []
+                for i in range(num_points):
+                    angle = (i / num_points) * 2 * math.pi
+                    # Deterministic variation for consistent irregular shape
+                    variation = 0.7 + 0.6 * ((i * 3) % 5) / 5
+                    r = radius * variation
+                    px = screen_x + int(math.cos(angle) * r)
+                    py = screen_y + int(math.sin(angle) * r)
+                    points.append((px, py))
+                pygame.draw.polygon(surface, color, points)
+                # Slightly lighter outline
+                pygame.draw.polygon(surface, (50, 100, 50), points, 2)
+
+            elif entity_type == "water":
+                color = self.config.colors.WATER
+                radius = max(8, int(entity_radius * zoom))
+                # Draw water as a filled circle with ripple effect
+                pygame.draw.circle(surface, color, (screen_x, screen_y), radius)
+                # Inner lighter ring for depth effect
+                pygame.draw.circle(surface, (80, 140, 220), (screen_x, screen_y), int(radius * 0.7), 2)
+                # Lighter outline
+                pygame.draw.circle(surface, (100, 160, 240), (screen_x, screen_y), radius, 2)
+
             else:
                 color = self.config.colors.ENTITY
                 radius = max(4, int(entity_radius * zoom))
@@ -155,6 +185,85 @@ class AgentPOVPanel(BasePanel):
             surface.blit(text, text_rect)
 
 
+class AgentTablePanel(BasePanel):
+    """Table showing all agents and their stats."""
+
+    def render(self, surface: pygame.Surface, agents_data: List[Dict[str, Any]],
+               selected_id: Optional[str] = None) -> None:
+        """Render agent stats table.
+
+        Args:
+            surface: Pygame surface to draw on.
+            agents_data: List of agent data dicts with id, alive, energy, health, age, gender, etc.
+            selected_id: Currently selected agent ID (highlighted).
+        """
+        rect = self.config.layout.agent_table_rect
+        self.draw_panel_background(surface, rect)
+
+        x, y = rect[0] + 8, rect[1] + 8
+        line_height = 18
+
+        # Header
+        header = self.font_small.render("Agent Stats (click to select)", True, self.config.colors.TEXT_BRIGHT)
+        surface.blit(header, (x, y))
+        y += 24
+
+        # Column headers (monospace) - readable format with wider panel
+        col_header = "ID  Sts  Gen  Energy  Health   Age  G  Breed  Social"
+        header_surf = self.font_mono.render(col_header, True, self.config.colors.TEXT)
+        surface.blit(header_surf, (x, y))
+        y += line_height
+
+        # Separator line
+        pygame.draw.line(surface, self.config.colors.GRID, (x, y), (rect[0] + rect[2] - 8, y))
+        y += 4
+
+        # Agent rows
+        for agent in agents_data:
+            # Highlight selected agent
+            if agent.get('id') == selected_id:
+                highlight_rect = (rect[0] + 2, y - 1, rect[2] - 4, line_height)
+                pygame.draw.rect(surface, (60, 60, 80), highlight_rect)
+
+            # Status indicator
+            if agent.get('alive', False):
+                status = " + "
+                status_color = self.config.colors.FOOD
+            else:
+                status = " - "
+                status_color = self.config.colors.PUNISH
+
+            # Format values with good spacing
+            agent_id = str(agent.get('id', '?'))[-2:].rjust(2)
+            gen = str(agent.get('generation', 0)).rjust(4)
+            energy = f"{agent.get('energy', 0)*100:.0f}%".rjust(6)
+            health = f"{agent.get('health', 0)*100:.0f}%".rjust(6)
+            age = f"{agent.get('age', 0):.0f}s".rjust(5)
+            gender = agent.get('gender', '?')[0].upper()
+            breed = f"{agent.get('breeding_drive', 0)*100:.0f}%".rjust(6)
+            social = f"{agent.get('social', 0.5)*100:.0f}%".rjust(6)
+
+            # Draw ID part with appropriate color
+            id_color = self.config.colors.TEXT_BRIGHT if agent.get('alive') else self.config.colors.TEXT
+            id_surf = self.font_mono.render(f"{agent_id}  ", True, id_color)
+            surface.blit(id_surf, (x, y))
+
+            # Draw status with color
+            status_x = x + self.font_mono.size(f"{agent_id}  ")[0]
+            status_surf = self.font_mono.render(status, True, status_color)
+            surface.blit(status_surf, (status_x, y))
+
+            # Draw rest of row
+            rest = f" {gen}  {energy}  {health}  {age}  {gender}  {breed}  {social}"
+            rest_surf = self.font_mono.render(rest, True, self.config.colors.TEXT)
+            rest_x = status_x + self.font_mono.size(status)[0]
+            surface.blit(rest_surf, (rest_x, y))
+
+            y += line_height
+            if y > rect[1] + rect[3] - 15:
+                break  # Don't overflow panel
+
+
 class StatusPanel(BasePanel):
     """Agent status information."""
 
@@ -167,34 +276,49 @@ class StatusPanel(BasePanel):
         x, y = rect[0] + 10, rect[1] + 10
         line_height = 25
 
+        # Agent ID and gender
+        agent_id = agent_state.get("agent_id", "?")
+        gender = agent_state.get("gender", "?")
+        text = self.font_small.render(
+            f"Agent: {agent_id} ({gender})",
+            True,
+            self.config.colors.TEXT
+        )
+        surface.blit(text, (x, y))
+
         # Energy bar
         energy = agent_state.get("energy", 0.0)
-        self._draw_progress_bar(surface, "Energy", energy, x, y,
+        self._draw_progress_bar(surface, "Energy", energy, x, y + line_height,
                                self.config.colors.REWARD)
 
         # Health bar
         health = agent_state.get("health", 0.0)
-        self._draw_progress_bar(surface, "Health", health, x, y + line_height,
+        self._draw_progress_bar(surface, "Health", health, x, y + 2 * line_height,
                                self.config.colors.PUNISH)
 
-        # Age and survival time
+        # Breeding drive bar
+        breeding_drive = agent_state.get("breeding_drive", 0.0)
+        can_breed = agent_state.get("can_breed", False)
+        breed_color = (255, 100, 200) if can_breed else (150, 80, 120)
+        self._draw_progress_bar(surface, "Breed", breeding_drive, x, y + 3 * line_height,
+                               breed_color)
+
+        # Age
         age = agent_state.get("age", 0.0)
-        survival = agent_state.get("survival_time", 0.0)
-
         text = self.font_small.render(
-            f"Age: {age:.1f}s  Survival: {survival:.1f}s",
+            f"Age: {age:.1f}s",
             True,
             self.config.colors.TEXT
         )
-        surface.blit(text, (x, y + 2 * line_height))
+        surface.blit(text, (x, y + 4 * line_height))
 
-        # Mode and signal
+        # Mode
         text = self.font_small.render(
-            f"Mode: {mode}  Signal: NONE",
+            f"Mode: {mode}",
             True,
             self.config.colors.TEXT
         )
-        surface.blit(text, (x, y + 3 * line_height))
+        surface.blit(text, (x, y + 5 * line_height))
 
     def _draw_progress_bar(self, surface: pygame.Surface, label: str,
                           value: float, x: int, y: int, color: tuple) -> None:
@@ -308,11 +432,9 @@ class ControlsPanel(BasePanel):
         # Legend and controls
         controls = [
             ("Legend & Controls", self.config.colors.TEXT_BRIGHT, self.font),
-            ("BLUE circle = Agent (learning AI)    GREEN = Food    RED triangle = Predator", self.config.colors.TEXT, self.font_small),
-            ("", self.config.colors.TEXT, self.font_small),
-            ("TEACHING: SPACE=Reward (good!)  X=Punish (bad!)  - Agent learns from your feedback", self.config.colors.REWARD, self.font_small),
-            ("CONTROL:  C=Toggle control mode, then ARROWS to move agent toward food", self.config.colors.AGENT, self.font_small),
-            ("Agent eats GREEN food when close + hungry. Avoid RED predators! ESC=Quit", self.config.colors.TEXT, self.font_small),
+            ("BLUE=Agent  GREEN=Food  RED=Predator  DARK GREEN=Vegetation  BLUE CIRCLE=Water", self.config.colors.TEXT, self.font_small),
+            ("EDIT: F=Food  V=Veg  P=Predator  W=Water  D=ClearVeg  T=ResetHP  |  S=Save  L=List", self.config.colors.WAVEFORM, self.font_small),
+            ("LOAD: 1-9=Load saved agent into dead slot  |  TIME: [=Slow ]=Fast  |  ESC=Quit", self.config.colors.TEXT, self.font_small),
         ]
 
         for i, (line, color, font) in enumerate(controls):

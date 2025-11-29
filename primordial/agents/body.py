@@ -7,6 +7,8 @@ embodiment with sensors, actuators, and survival mechanics.
 from __future__ import annotations
 
 import math
+import random
+from enum import Enum
 from typing import TYPE_CHECKING, Dict, Optional, Any
 
 import numpy as np
@@ -16,6 +18,14 @@ from primordial.world.entities import Entity, EntityType
 from primordial.world.geometry import Circle, Vec2
 from primordial.agents.genome import AgentGenome, create_default_genome
 from primordial.agents.actions import AgentAction
+
+
+class Gender(Enum):
+    """Agent gender for breeding."""
+    MALE = "male"
+    FEMALE = "female"
+
+
 from primordial.agents.sensors import (
     VisionSensor,
     AudioSensor,
@@ -111,6 +121,20 @@ class AgentBody(Entity):
         self.last_damage_time = -1.0
         self.death_cause: Optional[str] = None
 
+        # Breeding
+        self.gender = random.choice([Gender.MALE, Gender.FEMALE])
+        self.breeding_drive = 0.0  # 0.0 to 1.0, accumulates after maturity
+        self.maturity_age = 30.0  # Seconds before breeding drive starts
+        self.breeding_drive_rate = 0.02  # Drive increase per second after maturity
+        self.last_breed_time = -1.0  # Age when last bred (for cooldown)
+        self.breeding_cooldown = 10.0  # Seconds between breeding attempts
+
+        # Social connection - increases near other agents, depletes when alone
+        self.social_connection = 0.5  # 0.0 to 1.0, starts at 50%
+        self.social_radius = 60.0  # Distance to count as "near" other agents
+        self.social_gain_rate = 0.15  # How fast it increases when near others (per second)
+        self.social_decay_rate = 0.05  # How fast it depletes when alone (per second)
+
         # Most recent action (for vocalization detection by other agents)
         self.last_action: Optional[AgentAction] = None
 
@@ -151,6 +175,41 @@ class AgentBody(Entity):
         # Apply drag to angular velocity
         drag_coefficient = 0.95
         self.angular_velocity *= drag_coefficient ** (dt * 60)  # Normalize to 60fps
+
+        # Check for water interaction (energy gain)
+        self._check_water_interaction(world, dt)
+
+        # Update breeding drive (accumulates after maturity)
+        self._update_breeding_drive(dt)
+
+        # Update social connection (based on nearby agents)
+        self._update_social_connection(world, dt)
+
+    def _update_social_connection(self, world: World, dt: float) -> None:
+        """Update social connection based on nearby agents.
+
+        Social connection increases when near other agents and
+        depletes when alone. Low social connection causes discomfort.
+
+        Args:
+            world: World instance for spatial queries.
+            dt: Time step in seconds.
+        """
+        # Count nearby living agents
+        nearby_agents = 0
+        for entity in world.get_entities_in_radius(self.position, self.social_radius):
+            # Check if it's an agent (has is_alive attribute) and not self
+            if (hasattr(entity, 'is_alive') and entity.is_alive and
+                hasattr(entity, 'agent_id') and entity.agent_id != self.agent_id):
+                nearby_agents += 1
+
+        if nearby_agents > 0:
+            # Gain social connection when near others (more agents = faster gain)
+            gain = self.social_gain_rate * min(nearby_agents, 3) * dt
+            self.social_connection = min(1.0, self.social_connection + gain)
+        else:
+            # Decay when alone
+            self.social_connection = max(0.0, self.social_connection - self.social_decay_rate * dt)
 
     def apply_action(self, action: AgentAction, dt: float, world: World) -> None:
         """Apply action and update physics.
@@ -239,6 +298,69 @@ class AgentBody(Entity):
 
         self.is_eating = False
 
+    def _check_water_interaction(self, world: World, dt: float) -> None:
+        """Check for water contact and gain energy.
+
+        Water provides a small continuous energy boost when touched.
+
+        Args:
+            world: World instance.
+            dt: Time step.
+        """
+        from primordial.world.entities import Water
+
+        water_energy_rate = 10.0  # Energy per second when touching water
+
+        for entity in world.static_entities:
+            if not isinstance(entity, Water) or not entity.is_active:
+                continue
+
+            distance = self.position.distance_to(entity.position)
+
+            if distance < self.radius + entity.radius:
+                # Touching water - gain energy
+                energy_gain = water_energy_rate * dt
+                self.energy = min(self.genome.max_energy, self.energy + energy_gain)
+                return
+
+    def _update_breeding_drive(self, dt: float) -> None:
+        """Update breeding drive over time.
+
+        Drive accumulates after agent reaches maturity age.
+        Caps at 1.0.
+
+        Args:
+            dt: Time step.
+        """
+        if self.age < self.maturity_age:
+            return
+
+        # Check if on cooldown from recent breeding
+        if self.last_breed_time > 0 and (self.age - self.last_breed_time) < self.breeding_cooldown:
+            return
+
+        # Accumulate drive
+        self.breeding_drive = min(1.0, self.breeding_drive + self.breeding_drive_rate * dt)
+
+    def can_breed(self) -> bool:
+        """Check if agent is ready to breed.
+
+        Returns:
+            True if mature, has high drive, and not on cooldown.
+        """
+        if self.age < self.maturity_age:
+            return False
+        if self.breeding_drive < 0.5:  # Need at least 50% drive
+            return False
+        if self.last_breed_time > 0 and (self.age - self.last_breed_time) < self.breeding_cooldown:
+            return False
+        return True
+
+    def on_breed_success(self) -> None:
+        """Called when breeding is successful. Resets drive and sets cooldown."""
+        self.breeding_drive = 0.0
+        self.last_breed_time = self.age
+
     def _update_energy(self, action: AgentAction, dt: float) -> None:
         """Update energy based on activity.
 
@@ -283,13 +405,30 @@ class AgentBody(Entity):
         if self.health <= 0:
             self.die("health_depleted")
 
-    def take_damage(self, amount: float) -> None:
-        """Apply damage with resistance.
+    def take_damage(self, amount: float, world: World = None) -> None:
+        """Apply damage with resistance and group protection.
+
+        Agents in groups take less damage (safety in numbers).
+        Each nearby agent reduces damage by 15%, up to 60% reduction.
 
         Args:
             amount: Raw damage amount.
+            world: World instance for checking nearby agents (optional).
         """
         actual_damage = amount / self.genome.damage_resistance
+
+        # Group protection - nearby agents reduce damage taken
+        if world is not None:
+            nearby_agents = 0
+            for entity in world.get_entities_in_radius(self.position, self.social_radius):
+                if (hasattr(entity, 'is_alive') and entity.is_alive and
+                    hasattr(entity, 'agent_id') and entity.agent_id != self.agent_id):
+                    nearby_agents += 1
+
+            # Each nearby agent reduces damage by 15%, max 60% reduction (4 agents)
+            protection = min(0.60, nearby_agents * 0.15)
+            actual_damage *= (1.0 - protection)
+
         self.health = max(0.0, self.health - actual_damage)
         self.last_damage_time = self.age
 
@@ -388,6 +527,9 @@ class AgentBody(Entity):
             "age": self.age,
             "is_alive": self.is_alive,
             "death_cause": self.death_cause,
+            "gender": self.gender.value,
+            "breeding_drive": self.breeding_drive,
+            "last_breed_time": self.last_breed_time,
         }
 
     @classmethod
@@ -415,6 +557,12 @@ class AgentBody(Entity):
         agent.age = data["age"]
         agent.is_alive = data["is_alive"]
         agent.death_cause = data.get("death_cause")
+
+        # Breeding state (with defaults for backwards compatibility)
+        if "gender" in data:
+            agent.gender = Gender(data["gender"])
+        agent.breeding_drive = data.get("breeding_drive", 0.0)
+        agent.last_breed_time = data.get("last_breed_time", -1.0)
 
         if not agent.is_alive:
             agent.is_active = False

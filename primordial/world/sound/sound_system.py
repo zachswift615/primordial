@@ -100,6 +100,12 @@ class SoundSystem:
 
             to_source_normalized = to_source * (1.0 / to_source_mag)
 
+            # Rear attenuation: sounds behind are quieter (head shadow effect)
+            # dot product with facing: +1 = directly in front, -1 = directly behind
+            forward_dot = to_source_normalized.dot(listener_facing)
+            # Map from [-1, 1] to [0.3, 1.0] - sounds behind attenuated to 30%
+            directional_attenuation = 0.3 + 0.7 * (forward_dot + 1.0) / 2.0
+
             # Right vector (perpendicular to facing, rotated 90 degrees clockwise)
             right = Vec2(listener_facing.y, -listener_facing.x)
 
@@ -111,8 +117,9 @@ class SoundSystem:
             left_gain = (1.0 - pan) / 2.0
             right_gain = (1.0 + pan) / 2.0
 
-            left_total += attenuated_intensity * left_gain
-            right_total += attenuated_intensity * right_gain
+            # Apply directional attenuation to both ears
+            left_total += attenuated_intensity * left_gain * directional_attenuation
+            right_total += attenuated_intensity * right_gain * directional_attenuation
 
         # Clamp to [0, 1]
         left_total = min(1.0, max(0.0, left_total))

@@ -23,6 +23,9 @@ class SimpleAgentState:
     max_energy: float
     is_alive: bool
     is_eating: bool
+    speed: float = 0.0  # Movement speed for exploration reward
+    breeding_drive: float = 0.0  # Breeding drive for discomfort signal
+    social_connection: float = 0.5  # Social connection for loneliness signal
 
 
 class AgentWrapper:
@@ -46,6 +49,23 @@ class AgentWrapper:
         """
         self.config = config
         self.agent_id = agent_id
+
+        # Fitness tracking for evolution
+        self.food_eaten = 0
+        self.generation = 0
+
+        # Lifetime stats (persist across respawns for lineage tracking)
+        self.lifetime_stats = {
+            'total_food_eaten': 0,
+            'times_bred': 0,
+            'offspring_count': 0,
+            'deaths': 0,
+            'total_time_alive': 0.0,
+            'longest_life': 0.0,
+            'predators_evaded': 0,  # Times escaped from chase
+            'damage_taken': 0.0,
+            'created_at': None,  # Set when first created
+        }
 
         # Create agent body
         genome = create_default_genome()
@@ -122,6 +142,9 @@ class AgentWrapper:
             max_energy=self.agent.genome.max_energy,
             is_alive=self.agent.is_alive,
             is_eating=self.agent.is_eating,
+            speed=self.agent.velocity.magnitude(),
+            breeding_drive=self.agent.breeding_drive,
+            social_connection=self.agent.social_connection,
         )
 
         # 2. Think + Learn
@@ -213,14 +236,42 @@ class AgentWrapper:
         expanded = audio_tensor.unsqueeze(0).unsqueeze(0).expand(1, 100, 2)
         return expanded
 
-    def _tensor_to_action(self, action_tensor: torch.Tensor) -> AgentAction:
-        """Convert model output to AgentAction."""
-        a = action_tensor.squeeze(0).detach().cpu().numpy()
+    def _tensor_to_action(self, action_tensor: torch.Tensor, add_exploration_noise: bool = True) -> AgentAction:
+        """Convert model output to AgentAction.
+
+        Applies appropriate activations:
+        - tanh for thrust and torque (range: -1 to 1)
+        - sigmoid for vocalize and eat (range: 0 to 1)
+
+        Args:
+            action_tensor: Raw action logits from model
+            add_exploration_noise: If True, add noise to encourage exploration
+        """
+        a = action_tensor.squeeze(0).detach()
+
+        # Apply activations
+        thrust = torch.tanh(a[0]).item()
+        torque = torch.tanh(a[1]).item()
+        vocalize_freq = torch.sigmoid(a[2]).item()
+        vocalize_amp = torch.sigmoid(a[3]).item()
+        eat = torch.sigmoid(a[4]).item()
+
+        # Add exploration noise to thrust/torque to encourage movement
+        # This helps bootstrap learning by ensuring agent explores
+        if add_exploration_noise:
+            import numpy as np
+            noise_scale = 0.3  # Moderate exploration noise
+            thrust += np.random.normal(0, noise_scale)
+            torque += np.random.normal(0, noise_scale)
+            # Clamp back to valid range
+            thrust = max(-1.0, min(1.0, thrust))
+            torque = max(-1.0, min(1.0, torque))
+
         return AgentAction(
-            thrust=float(a[0]),
-            torque=float(a[1]),
-            vocalize=(float(a[2]), float(a[3])),
-            eat=float(a[4])
+            thrust=thrust,
+            torque=torque,
+            vocalize=(vocalize_freq, vocalize_amp),
+            eat=eat
         )
 
     def _collect_events(
@@ -237,10 +288,14 @@ class AgentWrapper:
         # Eating event
         if current_state.is_eating and not prev_state.is_eating:
             events.append('ate_food')
+            self.food_eaten += 1  # Track for fitness/reproduction
+            self.lifetime_stats['total_food_eaten'] += 1
 
         # Damage event
         if current_state.health < prev_state.health:
             events.append('took_damage')
+            damage = prev_state.health - current_state.health
+            self.lifetime_stats['damage_taken'] += damage
 
         # Death event
         if not current_state.is_alive and prev_state.is_alive:
@@ -250,9 +305,47 @@ class AgentWrapper:
 
     def on_death(self) -> Dict[str, Any]:
         """Handle agent death."""
+        # Update lifetime stats
+        self.lifetime_stats['deaths'] += 1
+        self.lifetime_stats['total_time_alive'] += self.agent.age
+        if self.agent.age > self.lifetime_stats['longest_life']:
+            self.lifetime_stats['longest_life'] = self.agent.age
+
         if self.learning_loop is not None:
             return self.learning_loop.on_death()
-        return {'death_count': 0}
+        return {'death_count': self.lifetime_stats['deaths']}
+
+    def get_fitness(self) -> float:
+        """Get fitness score for evolution (food eaten + survival time bonus)."""
+        return self.food_eaten + (self.agent.age / 60.0)  # 1 point per minute survived
+
+    def respawn_with_genome(self, parent_genome, new_position: Vec2, parent_generation: int = 0):
+        """Respawn agent with inherited (mutated) genome from parent."""
+        import random
+
+        # Mutate parent genome
+        new_genome = parent_genome.mutate()
+
+        # Remove old agent from world tracking
+        self.agent.is_active = False
+
+        # Create new body with mutated genome
+        self.agent = AgentBody(
+            agent_id=self.agent_id,
+            genome=new_genome,
+            initial_position=new_position
+        )
+
+        # Reset fitness tracking
+        self.food_eaten = 0
+        self.generation = parent_generation + 1
+
+        # Reset learning state
+        self.prev_senses = None
+        self.prev_modalities = None
+        self.prev_agent_state = None
+
+        print(f"{self.agent_id} respawned (gen {self.generation}) from parent genome")
 
     def save_checkpoint(self, path: str) -> None:
         """Save agent state and model."""

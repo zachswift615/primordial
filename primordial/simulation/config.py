@@ -28,10 +28,13 @@ class SimulationConfig:
     tick_rate: int = 60
 
     # Agent settings
-    max_agents: int = 1
+    max_agents: int = 5  # Multiple agents for evolution
     initial_food: int = 50
     max_food: int = 100
-    predator_count: int = 3
+    predator_count: int = 2
+    vegetation_clusters: int = 8  # Reduced to give agents more room
+    water_bodies: int = 2
+    food_to_reproduce: int = 3  # Food eaten before agent can reproduce
 
     # Learning settings
     learning_enabled: bool = True

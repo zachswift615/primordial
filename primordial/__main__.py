@@ -34,12 +34,39 @@ def main():
     sim_parser.add_argument('--steps', type=int, default=1000)
     sim_parser.add_argument('--output', type=str, default=None)
 
+    # Agents command (database management)
+    agents_parser = subparsers.add_parser(
+        'agents',
+        help='Manage saved agents database'
+    )
+    agents_subparsers = agents_parser.add_subparsers(dest='agents_command')
+
+    # agents list
+    list_parser = agents_subparsers.add_parser('list', help='List saved agents')
+    list_parser.add_argument('--sort', choices=['longest_life', 'total_food_eaten', 'offspring_count', 'generation', 'saved_at'],
+                             default='longest_life', help='Sort by column')
+    list_parser.add_argument('--limit', type=int, default=20, help='Max results')
+    list_parser.add_argument('--asc', action='store_true', help='Sort ascending')
+
+    # agents show
+    show_parser = agents_subparsers.add_parser('show', help='Show agent details')
+    show_parser.add_argument('id', type=int, help='Agent database ID')
+
+    # agents delete
+    del_parser = agents_subparsers.add_parser('delete', help='Delete an agent')
+    del_parser.add_argument('id', type=int, help='Agent database ID')
+
+    # agents stats
+    agents_subparsers.add_parser('stats', help='Show database statistics')
+
     args = parser.parse_args()
 
     if args.command == 'experiment':
         run_experiment_command(args)
     elif args.command == 'simulate':
         run_simulate(args)
+    elif args.command == 'agents':
+        run_agents(args)
     elif args.command == 'interface' or args.command is None:
         run_interface(args if args.command else parser.parse_args(['interface']))
 
@@ -58,7 +85,7 @@ def run_interface(args):
     sim_config = SimulationConfig(
         world_width=640,
         world_height=480,
-        max_agents=1,
+        max_agents=10,
         predator_count=2,
         initial_food=30,
         learning_enabled=True,
@@ -96,6 +123,64 @@ def run_simulate(args):
     if args.output:
         sim.save_state(args.output)
         print(f"\nState saved to: {args.output}")
+
+
+def run_agents(args):
+    """Manage the agents database."""
+    from primordial.simulation.agent_database import AgentDatabase
+
+    db = AgentDatabase()
+
+    if args.agents_command == 'list':
+        agents = db.list_agents(
+            order_by=args.sort,
+            descending=not args.asc,
+            limit=args.limit
+        )
+        print(f"\n=== Agents (sorted by {args.sort}) ===")
+        print(db.format_agent_list(agents))
+        print()
+
+    elif args.agents_command == 'show':
+        agent = db.get_agent(args.id)
+        if agent:
+            print(f"\n=== Agent #{agent.id}: {agent.name} ===")
+            print(f"  Generation: {agent.generation}")
+            print(f"  Total food eaten: {agent.total_food_eaten}")
+            print(f"  Times bred: {agent.times_bred}")
+            print(f"  Offspring count: {agent.offspring_count}")
+            print(f"  Deaths: {agent.deaths}")
+            print(f"  Total time alive: {agent.total_time_alive:.1f}s")
+            print(f"  Longest life: {agent.longest_life:.1f}s")
+            print(f"  Damage taken: {agent.damage_taken:.1f}")
+            print(f"  Notes: {agent.notes or '(none)'}")
+            print(f"  Model path: {agent.model_path}")
+            print()
+        else:
+            print(f"Agent {args.id} not found")
+
+    elif args.agents_command == 'delete':
+        if db.delete_agent(args.id):
+            print(f"Deleted agent {args.id}")
+        else:
+            print(f"Agent {args.id} not found")
+
+    elif args.agents_command == 'stats':
+        stats = db.get_stats()
+        print(f"\n=== Agent Database Statistics ===")
+        print(f"  Total agents: {stats['total_agents']}")
+        print(f"  Best longest life: {stats['max_longest_life']:.1f}s")
+        print(f"  Most food eaten: {stats['max_food_eaten']}")
+        print(f"  Most offspring: {stats['max_offspring']}")
+        print(f"  Highest generation: {stats['max_generation']}")
+        print()
+
+    else:
+        print("Use: python -m primordial agents [list|show|delete|stats]")
+        print("  list  - List saved agents (--sort, --limit, --asc)")
+        print("  show  - Show agent details (id)")
+        print("  delete - Delete an agent (id)")
+        print("  stats - Show database statistics")
 
 
 if __name__ == "__main__":

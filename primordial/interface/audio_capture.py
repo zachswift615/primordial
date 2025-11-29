@@ -32,6 +32,9 @@ class AudioCapture:
         self._stream: Optional[sd.InputStream] = None
         self._recording = False
 
+        # Push-to-talk: muted by default
+        self._muted = True
+
     def _audio_callback(self, indata, frames, time_info, status):
         """Callback for audio stream."""
         if status:
@@ -74,13 +77,36 @@ class AudioCapture:
         """Check if currently recording."""
         return self._recording
 
+    def is_muted(self) -> bool:
+        """Check if audio is muted (push-to-talk not active)."""
+        return self._muted
+
+    def set_muted(self, muted: bool) -> None:
+        """Set mute state for push-to-talk."""
+        self._muted = muted
+
+    def unmute(self) -> None:
+        """Unmute audio (call while push-to-talk key is held)."""
+        self._muted = False
+
+    def mute(self) -> None:
+        """Mute audio (call when push-to-talk key is released)."""
+        self._muted = True
+
     def get_buffer(self) -> np.ndarray:
         """Get the entire audio buffer."""
         with self._lock:
             return np.array(list(self._buffer), dtype=np.float32)
 
     def get_recent(self, num_samples: int) -> np.ndarray:
-        """Get the most recent N samples."""
+        """Get the most recent N samples.
+
+        Returns zeros if muted (push-to-talk not active).
+        """
+        # Return silence when muted
+        if self._muted:
+            return np.zeros(num_samples, dtype=np.float32)
+
         with self._lock:
             buffer_list = list(self._buffer)
             recent = buffer_list[-num_samples:] if len(buffer_list) >= num_samples else buffer_list

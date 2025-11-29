@@ -93,10 +93,17 @@ class World:
         self.predators: List[Predator] = []
         self.static_entities: List[Entity] = []
 
-        # Food spawning configuration
-        self.food_spawn_rate = 0.5  # Average food items spawned per second
-        self.max_food = 30
+        # Food spawning configuration with natural variation
+        self.base_food_spawn_rate = 2.0  # Much higher rate (was 0.5)
+        self.food_spawn_rate_variation = 0.4  # How much rate varies (0-1)
+        self.food_spawn_cycle_period = 60.0  # Seconds for full abundance cycle
+        self.max_food = 100  # Much higher cap (was 30)
         self.food_spawn_timer = 0.0
+        self.food_cycle_time = 0.0  # Tracks where we are in the cycle
+
+        # Predator population configuration
+        self.max_predators = 10  # Cap to prevent runaway growth
+        self.min_predators = 1  # Always keep at least one predator
 
     def add_entity(self, entity: Entity) -> int:
         """Add entity to world.
@@ -182,70 +189,207 @@ class World:
         """
         return self.spatial_grid.query_radius(position, radius, entity_type)
 
-    def tick(self) -> None:
-        """Advance simulation by one tick (1/60th second).
+    def tick(self, dt: float = None) -> None:
+        """Advance simulation by elapsed time.
+
+        Args:
+            dt: Elapsed time in seconds. If None, uses fixed timestep (1/tick_rate).
 
         Main simulation loop that:
         1. Updates environment
         2. Updates food spawning
         3. Updates all active entities
-        4. Runs physics step
-        5. Rebuilds spatial grid
-        6. Updates sound sources
+        4. Manages predator population
+        5. Runs physics step
+        6. Rebuilds spatial grid
+        7. Updates sound sources
         """
+        # Use provided dt or fall back to fixed timestep
+        step_dt = dt if dt is not None else self.dt
+
+        # Cap dt to prevent instability from large time jumps
+        step_dt = min(step_dt, 0.1)  # Max 100ms per tick
+
         # 1. Update environment
-        self.environment.update(self.dt)
+        self.environment.update(step_dt)
 
         # 2. Spawn food
-        self._update_food_spawning()
+        self._update_food_spawning(step_dt)
 
         # 3. Update all entities
         for entity in list(self.entities.values()):
             if entity.is_active:
-                entity.update(self, self.dt)
+                entity.update(self, step_dt)
 
-        # 4. Physics step
-        self.physics.step(list(self.entities.values()), self.dt)
+        # 4. Manage predator population (reproduction, death, cleanup)
+        self._update_predator_population()
 
-        # 5. Update spatial grid
+        # 5. Physics step
+        self.physics.step(list(self.entities.values()), step_dt)
+
+        # 6. Update spatial grid
         self._rebuild_spatial_grid()
 
-        # 6. Update sound system
+        # 7. Update sound system
         self._update_sound_sources()
 
-    def _update_food_spawning(self) -> None:
-        """Spawn food items at configured rate.
+    def _update_food_spawning(self, dt: float) -> None:
+        """Spawn food items at variable rate.
 
-        Uses a timer-based approach to spawn food at regular intervals
-        up to the maximum food limit.
+        Uses a timer-based approach with natural variation - food abundance
+        cycles like seasons, sometimes plentiful, sometimes scarce.
+
+        Args:
+            dt: Elapsed time in seconds.
         """
-        self.food_spawn_timer += self.dt
+        self.food_spawn_timer += dt
+        self.food_cycle_time += dt
+
+        # Calculate current spawn rate with sinusoidal variation
+        # Creates natural "seasons" of abundance and scarcity
+        cycle_phase = (self.food_cycle_time / self.food_spawn_cycle_period) * 2 * np.pi
+        variation = np.sin(cycle_phase) * self.food_spawn_rate_variation
+        current_rate = self.base_food_spawn_rate * (1.0 + variation)
+
+        # Add some random noise for unpredictability
+        current_rate *= np.random.uniform(0.8, 1.2)
+
+        # Clamp to reasonable bounds
+        current_rate = max(0.1, min(2.0, current_rate))
+
+        # Count only active food items
+        active_food_count = sum(1 for f in self.food_items if f.is_active)
 
         # Check if time to spawn
-        spawn_interval = 1.0 / self.food_spawn_rate
-        while self.food_spawn_timer >= spawn_interval and len(self.food_items) < self.max_food:
-            self._spawn_food()
-            self.food_spawn_timer -= spawn_interval
+        if current_rate > 0:
+            spawn_interval = 1.0 / current_rate
+            while self.food_spawn_timer >= spawn_interval and active_food_count < self.max_food:
+                self._spawn_food()
+                self.food_spawn_timer -= spawn_interval
+                active_food_count += 1
 
     def _spawn_food(self) -> None:
         """Spawn a food item at random location.
 
-        Creates food with margin from world edges to avoid spawning
-        on boundaries.
+        Creates food with margin from world edges and avoids spawning
+        on top of vegetation.
         """
-        # Random position with margin from edges
         margin = 50.0
+        max_attempts = 10
+
+        for _ in range(max_attempts):
+            x = np.random.uniform(margin, self.width - margin)
+            y = np.random.uniform(margin, self.height - margin)
+            pos = Vec2(x, y)
+
+            # Check if position overlaps with any vegetation
+            overlaps = False
+            for veg in self.vegetation:
+                if pos.distance_to(veg.position) < veg.radius + 10:  # 10 unit buffer
+                    overlaps = True
+                    break
+
+            if not overlaps:
+                food = Food(
+                    entity_id=self.next_entity_id,
+                    position=pos,
+                    energy_value=50.0,
+                    sound_intensity=0.1,
+                )
+                self.add_entity(food)
+                return
+
+        # If all attempts failed, spawn anyway (rare edge case)
         x = np.random.uniform(margin, self.width - margin)
         y = np.random.uniform(margin, self.height - margin)
-
         food = Food(
             entity_id=self.next_entity_id,
             position=Vec2(x, y),
             energy_value=50.0,
             sound_intensity=0.1,
         )
-
         self.add_entity(food)
+
+    def _update_predator_population(self) -> None:
+        """Manage predator population: remove dead, check reproduction.
+
+        Handles:
+        - Removing predators that died from starvation
+        - Spawning offspring from well-fed predators
+        - Enforcing population caps
+        """
+        # Count active predators and collect dead ones
+        active_predators = []
+        dead_predators = []
+
+        for predator in self.predators:
+            if predator.is_active:
+                active_predators.append(predator)
+            else:
+                dead_predators.append(predator)
+
+        # Remove dead predators from world
+        for predator in dead_predators:
+            self.remove_entity(predator.id)
+
+        # Check for reproduction (only if below max)
+        if len(active_predators) < self.max_predators:
+            for predator in active_predators:
+                if predator.can_reproduce and predator.try_reproduce():
+                    self._spawn_predator_offspring(predator)
+                    # Only spawn one per tick to prevent rapid growth
+                    break
+
+        # Note: No automatic respawn - predators must reproduce to survive
+
+    def _spawn_predator_offspring(self, parent: Predator) -> None:
+        """Spawn a predator offspring near parent.
+
+        Args:
+            parent: Parent predator.
+        """
+        # Spawn near parent with some offset
+        offset = Vec2(
+            np.random.uniform(-50, 50),
+            np.random.uniform(-50, 50)
+        )
+        new_pos = parent.position + offset
+
+        # Clamp to world bounds
+        margin = 50.0
+        new_pos = Vec2(
+            max(margin, min(self.width - margin, new_pos.x)),
+            max(margin, min(self.height - margin, new_pos.y))
+        )
+
+        # Create offspring with patrol center near spawn point
+        offspring = Predator(
+            entity_id=self.next_entity_id,
+            position=new_pos,
+            patrol_center=new_pos,
+            patrol_radius=150.0,
+        )
+        # Offspring starts with moderate energy
+        offspring.energy = 80.0
+
+        self.add_entity(offspring)
+
+    def _spawn_predator_random(self) -> None:
+        """Spawn a predator at random location (for minimum population)."""
+        margin = 100.0
+        pos = Vec2(
+            np.random.uniform(margin, self.width - margin),
+            np.random.uniform(margin, self.height - margin)
+        )
+
+        predator = Predator(
+            entity_id=self.next_entity_id,
+            position=pos,
+            patrol_center=pos,
+            patrol_radius=150.0,
+        )
+
+        self.add_entity(predator)
 
     def _rebuild_spatial_grid(self) -> None:
         """Rebuild spatial grid with current entity positions.
@@ -280,17 +424,20 @@ class World:
                     )
                 )
 
-        # Add predator growls (only when chasing)
+        # Add predator sounds (growls when chasing, footsteps when patrolling)
         for predator in self.predators:
-            if predator.is_active and predator.is_growling:
-                self.sound_system.add_source(
-                    SoundSource(
-                        position=predator.position,
-                        frequency=predator.growl_frequency,
-                        intensity=predator.growl_intensity,
-                        is_active=True,
+            if predator.is_active:
+                sound_props = predator.get_sound_properties()
+                if sound_props is not None:
+                    intensity, frequency = sound_props
+                    self.sound_system.add_source(
+                        SoundSource(
+                            position=predator.position,
+                            frequency=frequency,
+                            intensity=intensity,
+                            is_active=True,
+                        )
                     )
-                )
 
         # Add water sounds
         for entity in self.static_entities:
@@ -371,3 +518,77 @@ class World:
             Current brightness level from environment.
         """
         return self.environment.get_brightness()
+
+    @property
+    def vegetation(self) -> List[Vegetation]:
+        """Get all vegetation entities.
+
+        Returns:
+            List of Vegetation entities.
+        """
+        return [e for e in self.static_entities if isinstance(e, Vegetation)]
+
+    def has_line_of_sight(self, from_pos: Vec2, to_pos: Vec2) -> bool:
+        """Check if there's clear line of sight between two positions.
+
+        Tests if the ray from from_pos to to_pos intersects any vegetation.
+        Used for predator detection - agents can hide behind vegetation.
+
+        Args:
+            from_pos: Starting position of the line of sight check.
+            to_pos: Target position to check visibility to.
+
+        Returns:
+            True if line of sight is clear, False if blocked by vegetation.
+        """
+        for veg in self.vegetation:
+            if self._ray_intersects_circle(from_pos, to_pos, veg.position, veg.radius):
+                return False
+        return True
+
+    def _ray_intersects_circle(
+        self,
+        ray_start: Vec2,
+        ray_end: Vec2,
+        circle_center: Vec2,
+        circle_radius: float,
+    ) -> bool:
+        """Check if a ray segment intersects a circle.
+
+        Uses the quadratic formula to find intersection points.
+
+        Args:
+            ray_start: Start of ray segment.
+            ray_end: End of ray segment.
+            circle_center: Center of the circle.
+            circle_radius: Radius of the circle.
+
+        Returns:
+            True if the ray segment intersects the circle.
+        """
+        # Direction vector of ray
+        dx = ray_end.x - ray_start.x
+        dy = ray_end.y - ray_start.y
+
+        # Vector from ray start to circle center
+        fx = ray_start.x - circle_center.x
+        fy = ray_start.y - circle_center.y
+
+        # Quadratic coefficients: a*t^2 + b*t + c = 0
+        a = dx * dx + dy * dy
+        b = 2.0 * (fx * dx + fy * dy)
+        c = fx * fx + fy * fy - circle_radius * circle_radius
+
+        discriminant = b * b - 4.0 * a * c
+
+        if discriminant < 0:
+            return False
+
+        # Check if intersection is within ray segment [0, 1]
+        discriminant = discriminant ** 0.5
+
+        t1 = (-b - discriminant) / (2.0 * a)
+        t2 = (-b + discriminant) / (2.0 * a)
+
+        # Check if either intersection point is on the segment
+        return (0 <= t1 <= 1) or (0 <= t2 <= 1)
