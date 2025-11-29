@@ -135,6 +135,12 @@ class CockpitApp:
             if event.type == pygame.QUIT:
                 self.running = False
 
+            if event.type == pygame.VIDEORESIZE:
+                self.window_width = event.w
+                self.window_height = event.h
+                self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+                self._rebuild_layout()
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
@@ -866,10 +872,43 @@ class CockpitApp:
                 return wrapper
         return None
 
+    def _get_world_transform(self) -> tuple:
+        """Get world-to-screen transform parameters.
+
+        Returns:
+            (world_rect, scale, offset_x, offset_y) tuple
+        """
+        left = self.PANEL_WIDTH if self.left_panel_visible else 0
+        right = self.window_width - (self.PANEL_WIDTH if self.right_panel_visible else 0)
+        top = self.TOPBAR_HEIGHT
+        bottom = self.window_height - self.BOTTOMBAR_HEIGHT
+
+        world_rect = pygame.Rect(left, top, right - left, bottom - top)
+
+        scale_x = world_rect.width / self.simulation.world.width
+        scale_y = world_rect.height / self.simulation.world.height
+        scale = min(scale_x, scale_y)
+
+        offset_x = world_rect.left + (world_rect.width - self.simulation.world.width * scale) / 2
+        offset_y = world_rect.top + (world_rect.height - self.simulation.world.height * scale) / 2
+
+        return world_rect, scale, offset_x, offset_y
+
     def _rebuild_layout(self) -> None:
         """Rebuild UI layout after panel toggle or resize."""
-        # Will be implemented to reposition panels
-        pass
+        # Update pygame-gui manager resolution
+        self.ui_manager.set_window_resolution((self.window_width, self.window_height))
+
+        # Clear any cached slider rects (they'll be recreated on next render)
+        for key in ["max_agents", "initial_food", "max_food", "predator_count", "tick_rate"]:
+            if hasattr(self, f"slider_{key}_rect"):
+                delattr(self, f"slider_{key}_rect")
+            if hasattr(self, f"slider_{key}_range"):
+                delattr(self, f"slider_{key}_range")
+
+        # Clear agent table rows (will be recreated on render)
+        if hasattr(self, 'agent_table_rows'):
+            self.agent_table_rows = []
 
     def run(self) -> None:
         """Main loop."""
