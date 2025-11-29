@@ -1115,9 +1115,42 @@ class CockpitApp:
         if hasattr(self, 'agent_table_rows'):
             self.agent_table_rows = []
 
+    def _auto_save_agents(self) -> None:
+        """Auto-save all living agents on exit."""
+        saved = 0
+        updated = 0
+        for wrapper in self.simulation.agents.values():
+            if wrapper.agent.is_alive:
+                db_id = getattr(wrapper, 'db_id', None)
+                self.agent_db.save_agent(wrapper, db_id=db_id)
+                if db_id:
+                    updated += 1
+                else:
+                    saved += 1
+
+        if saved > 0 or updated > 0:
+            print(f"\n{'='*50}")
+            print(f"  AUTO-SAVED: {updated} updated, {saved} new agents")
+            print(f"{'='*50}\n")
+
+    def _auto_load_agents(self) -> None:
+        """Auto-load best agents on start."""
+        stats = self.agent_db.get_stats()
+        if stats['total_agents'] == 0:
+            print("\n  NEW SIMULATION - No saved agents\n")
+            return
+
+        loaded = self.agent_db.auto_load_best_agents(self.simulation)
+        if loaded > 0:
+            print(f"\n{'='*50}")
+            print(f"  LOADED {loaded} agents from previous session")
+            print(f"  Total in DB: {stats['total_agents']}")
+            print(f"{'='*50}\n")
+
     def run(self) -> None:
         """Main loop."""
         self.running = True
+        self._auto_load_agents()  # Load on start
 
         while self.running:
             dt = self.clock.tick(60) / 1000.0
@@ -1130,6 +1163,7 @@ class CockpitApp:
 
     def cleanup(self) -> None:
         """Cleanup resources."""
+        self._auto_save_agents()  # Save on exit
         pygame.quit()
 
 
