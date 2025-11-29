@@ -187,6 +187,11 @@ class CockpitApp:
         self.genome_editor_open = False
         self.database_browser_open = False
 
+        # Genome editor state
+        self.genome_editor_agent_id: Optional[str] = None
+        self.genome_editor_values: Dict[str, float] = {}
+        self.genome_editor_tab = "physical"
+
         # Database browser state
         self.DB_AGENTS_PER_PAGE = 8  # Constant for pagination
         self.db_page = 0
@@ -294,6 +299,43 @@ class CockpitApp:
                 # Database browser modal (check first - highest priority)
                 if self._handle_database_browser_click(mouse_pos):
                     continue
+
+                # Genome editor handling
+                if self.genome_editor_open:
+                    if hasattr(self, 'ge_close_rect') and self.ge_close_rect.collidepoint(mouse_pos):
+                        self.genome_editor_open = False
+                        continue
+                    if hasattr(self, 'ge_cancel_rect') and self.ge_cancel_rect.collidepoint(mouse_pos):
+                        self.genome_editor_open = False
+                        continue
+
+                    # Tab switching
+                    if hasattr(self, 'ge_tab_rects'):
+                        for key, rect in self.ge_tab_rects.items():
+                            if rect.collidepoint(mouse_pos):
+                                self.genome_editor_tab = key
+                                continue
+
+                    # Apply button
+                    if hasattr(self, 'ge_apply_rect') and self.ge_apply_rect.collidepoint(mouse_pos):
+                        self._apply_genome_changes()
+                        continue
+
+                    # Reset button clicks
+                    if hasattr(self, 'ge_reset_rects'):
+                        for param, (rect, default) in self.ge_reset_rects.items():
+                            if rect.collidepoint(mouse_pos):
+                                self.genome_editor_values[param] = default
+                                continue
+
+                    # Slider interaction
+                    if hasattr(self, 'ge_slider_rects'):
+                        for param, (rect, min_v, max_v) in self.ge_slider_rects.items():
+                            if rect.collidepoint(mouse_pos):
+                                self.active_slider = f"ge_{param}"
+                                continue
+
+                    continue  # Consume click
 
                 # Help modal close button
                 if self.help_modal_open and hasattr(self, 'help_modal_close_btn_rect'):
@@ -482,64 +524,74 @@ class CockpitApp:
                 self.active_slider = None
 
             if event.type == pygame.MOUSEMOTION and self.active_slider:
-                rect = getattr(self, f"slider_{self.active_slider}_rect", None)
-                min_val, max_val = getattr(self, f"slider_{self.active_slider}_range", (0, 100))
-                if rect:
-                    rel_x = max(0, min(event.pos[0] - rect.x, rect.width))
-                    pct = rel_x / rect.width
-                    new_val = min_val + pct * (max_val - min_val)
+                # Genome editor sliders
+                if self.active_slider and self.active_slider.startswith("ge_"):
+                    param = self.active_slider.replace("ge_", "")
+                    if hasattr(self, 'ge_slider_rects') and param in self.ge_slider_rects:
+                        rect, min_v, max_v = self.ge_slider_rects[param]
+                        rel_x = max(0, min(event.pos[0] - rect.x, rect.width))
+                        pct = rel_x / rect.width
+                        new_val = min_v + pct * (max_v - min_v)
+                        self.genome_editor_values[param] = new_val
+                else:
+                    rect = getattr(self, f"slider_{self.active_slider}_rect", None)
+                    min_val, max_val = getattr(self, f"slider_{self.active_slider}_range", (0, 100))
+                    if rect:
+                        rel_x = max(0, min(event.pos[0] - rect.x, rect.width))
+                        pct = rel_x / rect.width
+                        new_val = min_val + pct * (max_val - min_val)
 
-                    # Handle genome sliders
-                    if self.active_slider.startswith("genome_"):
-                        attr_name = self.active_slider.replace("genome_", "")
-                        if hasattr(self.default_genome, attr_name):
-                            setattr(self.default_genome, attr_name, new_val)
-                    # Special handling for learning rate (convert display value to actual)
-                    elif self.active_slider == "learning_rate_display":
-                        self.control_values["learning_rate"] = new_val / 10000
-                        if hasattr(self.sim_config, "learning_rate"):
-                            self.sim_config.learning_rate = new_val / 10000
-                    # Handle LRN integer sliders
-                    elif self.active_slider in ["lrn_hidden_dim", "lrn_num_mixing_layers"]:
-                        new_val = int(round(new_val))
-                        self.control_values[self.active_slider] = new_val
-                        if hasattr(self.sim_config, self.active_slider):
-                            setattr(self.sim_config, self.active_slider, new_val)
-                    # Handle reward sliders
-                    elif self.active_slider.startswith("reward_"):
-                        reward_key = self.active_slider.replace("reward_", "")
-                        self.reward_values[reward_key] = new_val
-                        # Update SurvivalRewards class attribute
-                        attr_map = {
-                            "eating_food": "EATING_FOOD", "taking_damage": "TAKING_DAMAGE",
-                            "death": "DEATH", "starving": "STARVING", "low_health": "LOW_HEALTH",
-                            "healthy": "HEALTHY", "movement_bonus": "MOVEMENT_BONUS",
-                            "idle_penalty": "IDLE_PENALTY", "social_bonus": "SOCIAL_BONUS"
-                        }
-                        if reward_key in attr_map:
-                            setattr(SurvivalRewards, attr_map[reward_key], new_val)
-                    # Handle predator sliders
-                    elif self.active_slider.startswith("pred_"):
-                        config_map = {
-                            "pred_patrol_radius": "patrol_radius",
-                            "pred_patrol_speed": "patrol_speed",
-                            "pred_detection_radius": "detection_radius",
-                            "pred_chase_speed": "chase_speed",
-                            "pred_chase_abandon": "chase_abandon_distance",
-                            "pred_damage": "damage",
-                            "pred_attack_cooldown": "attack_cooldown",
-                        }
-                        if self.active_slider in config_map:
-                            self.predator_config[config_map[self.active_slider]] = new_val
-                    # Handle control value sliders
-                    elif self.active_slider in self.control_values:
-                        # Round integers
-                        if self.active_slider in ["max_agents", "initial_food", "max_food", "predator_count", "tick_rate"]:
+                        # Handle genome sliders
+                        if self.active_slider.startswith("genome_"):
+                            attr_name = self.active_slider.replace("genome_", "")
+                            if hasattr(self.default_genome, attr_name):
+                                setattr(self.default_genome, attr_name, new_val)
+                        # Special handling for learning rate (convert display value to actual)
+                        elif self.active_slider == "learning_rate_display":
+                            self.control_values["learning_rate"] = new_val / 10000
+                            if hasattr(self.sim_config, "learning_rate"):
+                                self.sim_config.learning_rate = new_val / 10000
+                        # Handle LRN integer sliders
+                        elif self.active_slider in ["lrn_hidden_dim", "lrn_num_mixing_layers"]:
                             new_val = int(round(new_val))
-                        self.control_values[self.active_slider] = new_val
-                        # Apply to config (live update) with validation
-                        if hasattr(self.sim_config, self.active_slider):
-                            setattr(self.sim_config, self.active_slider, new_val)
+                            self.control_values[self.active_slider] = new_val
+                            if hasattr(self.sim_config, self.active_slider):
+                                setattr(self.sim_config, self.active_slider, new_val)
+                        # Handle reward sliders
+                        elif self.active_slider.startswith("reward_"):
+                            reward_key = self.active_slider.replace("reward_", "")
+                            self.reward_values[reward_key] = new_val
+                            # Update SurvivalRewards class attribute
+                            attr_map = {
+                                "eating_food": "EATING_FOOD", "taking_damage": "TAKING_DAMAGE",
+                                "death": "DEATH", "starving": "STARVING", "low_health": "LOW_HEALTH",
+                                "healthy": "HEALTHY", "movement_bonus": "MOVEMENT_BONUS",
+                                "idle_penalty": "IDLE_PENALTY", "social_bonus": "SOCIAL_BONUS"
+                            }
+                            if reward_key in attr_map:
+                                setattr(SurvivalRewards, attr_map[reward_key], new_val)
+                        # Handle predator sliders
+                        elif self.active_slider.startswith("pred_"):
+                            config_map = {
+                                "pred_patrol_radius": "patrol_radius",
+                                "pred_patrol_speed": "patrol_speed",
+                                "pred_detection_radius": "detection_radius",
+                                "pred_chase_speed": "chase_speed",
+                                "pred_chase_abandon": "chase_abandon_distance",
+                                "pred_damage": "damage",
+                                "pred_attack_cooldown": "attack_cooldown",
+                            }
+                            if self.active_slider in config_map:
+                                self.predator_config[config_map[self.active_slider]] = new_val
+                        # Handle control value sliders
+                        elif self.active_slider in self.control_values:
+                            # Round integers
+                            if self.active_slider in ["max_agents", "initial_food", "max_food", "predator_count", "tick_rate"]:
+                                new_val = int(round(new_val))
+                            self.control_values[self.active_slider] = new_val
+                            # Apply to config (live update) with validation
+                            if hasattr(self.sim_config, self.active_slider):
+                                setattr(self.sim_config, self.active_slider, new_val)
 
             # Pass to pygame-gui
             self.ui_manager.process_events(event)
@@ -1670,6 +1722,9 @@ class CockpitApp:
         # Render database browser modal (on top of everything)
         self._render_database_browser()
 
+        # Render genome editor modal (on top of everything)
+        self._render_genome_editor()
+
         pygame.display.flip()
 
     def _send_reward(self) -> None:
@@ -1849,8 +1904,172 @@ class CockpitApp:
             print(f"Loaded: {record.name} into {dead_wrapper.agent_id}")
 
     def _open_genome_editor(self) -> None:
-        """Open genome editor modal (placeholder for future implementation)."""
-        print("Genome editor not yet implemented (Phase 6)")
+        """Open genome editor for selected agent."""
+        wrapper = self._get_target_agent_wrapper()
+        if not wrapper:
+            return
+        self.genome_editor_open = True
+        self.genome_editor_agent_id = wrapper.agent_id
+        # Copy current genome values
+        self.genome_editor_values = wrapper.agent.genome.to_dict()
+        self.genome_editor_tab = "physical"
+
+    def _render_genome_editor(self) -> None:
+        """Render genome editor modal."""
+        if not self.genome_editor_open:
+            return
+
+        # Darken background
+        overlay = pygame.Surface((self.window_width, self.window_height), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        self.screen.blit(overlay, (0, 0))
+
+        # Modal window - using updated dimensions from task spec (700x550)
+        modal_w, modal_h = 700, 550
+        modal_x = (self.window_width - modal_w) // 2
+        modal_y = (self.window_height - modal_h) // 2
+        modal_rect = pygame.Rect(modal_x, modal_y, modal_w, modal_h)
+
+        pygame.draw.rect(self.screen, self.BG_PANEL, modal_rect, border_radius=8)
+        pygame.draw.rect(self.screen, self.CYAN_DIM, modal_rect, 2, border_radius=8)
+
+        # Header
+        agent_name = self.genome_editor_agent_id[:8] if self.genome_editor_agent_id else "Unknown"
+        header_rect = pygame.Rect(modal_x, modal_y, modal_w, 36)
+        pygame.draw.rect(self.screen, self.BG_DARK, header_rect, border_top_left_radius=8, border_top_right_radius=8)
+        title = self.font.render(f"GENOME EDITOR: {agent_name}", True, self.CYAN)
+        self.screen.blit(title, (modal_x + 16, modal_y + 8))
+
+        # Close button
+        close_rect = pygame.Rect(modal_x + modal_w - 36, modal_y + 6, 24, 24)
+        pygame.draw.rect(self.screen, (80, 40, 40), close_rect, border_radius=4)
+        close_text = self.font_small.render("X", True, self.TEXT_BRIGHT)
+        self.screen.blit(close_text, (close_rect.x + 7, close_rect.y + 4))
+        self.ge_close_rect = close_rect
+
+        # Tabs - only Physical, Sensory, Metabolic per user spec
+        y = modal_y + 44
+        tabs = ["Physical", "Sensory", "Metabolic"]
+        tab_keys = ["physical", "sensory", "metabolic"]
+        tx = modal_x + 12
+        self.ge_tab_rects = {}
+        for label, key in zip(tabs, tab_keys):
+            tab_rect = pygame.Rect(tx, y, 110, 24)
+            is_active = self.genome_editor_tab == key
+            bg = (42, 42, 56) if is_active else (37, 37, 48)
+            border = self.CYAN if is_active else (37, 37, 48)
+            pygame.draw.rect(self.screen, bg, tab_rect, border_radius=4)
+            pygame.draw.rect(self.screen, border, tab_rect, 1, border_radius=4)
+            text_color = self.CYAN if is_active else self.TEXT_DIM
+            text = self.font_small.render(label, True, text_color)
+            self.screen.blit(text, (tx + 8, y + 5))
+            self.ge_tab_rects[key] = tab_rect
+            tx += 120
+
+        y += 36
+
+        # Tab content - sliders
+        x = modal_x + 20
+        width = modal_w - 40
+
+        # Tab parameters based on user spec
+        tab_params = {
+            "physical": [
+                ("max_speed", "Max Speed", 50, 300, 150.0),
+                ("max_angular_speed", "Max Angular Speed", 1.0, 6.0, 3.0),
+                ("thrust_force", "Thrust Force", 100, 1000, 500.0),
+                ("radius", "Radius", 4.0, 20.0, 8.0),
+            ],
+            "sensory": [
+                ("vision_range", "Vision Range", 50, 400, 200.0),
+                ("vision_fov", "Vision FOV", 60, 180, 120.0),
+                ("audio_range", "Audio Range", 50, 500, 300.0),
+                ("touch_range", "Touch Range", 5, 30, 15.0),
+            ],
+            "metabolic": [
+                ("max_energy", "Max Energy", 50, 200, 100.0),
+                ("max_health", "Max Health", 50, 200, 100.0),
+                ("base_energy_cost", "Base Energy Cost", 0.01, 0.5, 0.1),
+                ("eating_efficiency", "Eating Efficiency", 0.5, 1.5, 0.9),
+            ],
+        }
+
+        self.ge_slider_rects = {}
+        self.ge_reset_rects = {}
+        for param, label, min_v, max_v, default in tab_params.get(self.genome_editor_tab, []):
+            value = self.genome_editor_values.get(param, default)
+
+            # Label
+            lbl = self.font_small.render(label, True, self.TEXT_NORMAL)
+            self.screen.blit(lbl, (x, y))
+            def_text = self.font_small.render(f"Default: {default}", True, self.TEXT_DIM)
+            self.screen.blit(def_text, (x + width - def_text.get_width(), y))
+            y += 18
+
+            # Slider track
+            track_rect = pygame.Rect(x, y + 4, width - 80, 6)
+            pygame.draw.rect(self.screen, (37, 37, 48), track_rect, border_radius=3)
+
+            # Fill
+            pct = (value - min_v) / (max_v - min_v) if max_v > min_v else 0
+            fill_width = int(track_rect.width * max(0, min(1, pct)))
+            fill_rect = pygame.Rect(x, y + 4, fill_width, 6)
+            pygame.draw.rect(self.screen, self.CYAN_DIM, fill_rect, border_radius=3)
+
+            # Thumb
+            thumb_x = x + fill_width
+            thumb_rect = pygame.Rect(thumb_x - 6, y, 12, 14)
+            pygame.draw.rect(self.screen, self.CYAN, thumb_rect, border_radius=6)
+
+            # Store for interaction
+            slider_rect = pygame.Rect(x, y, width - 80, 14)
+            self.ge_slider_rects[param] = (slider_rect, min_v, max_v)
+
+            # Value display
+            val_str = f"{value:.2f}" if isinstance(value, float) else str(int(value))
+            val_text = self.font_small.render(val_str, True, self.TEXT_BRIGHT)
+            self.screen.blit(val_text, (x + width - 55, y))
+
+            # Reset button
+            reset_rect = pygame.Rect(x + width - 20, y, 16, 14)
+            pygame.draw.rect(self.screen, (60, 60, 70), reset_rect, border_radius=3)
+            reset_text = self.font_small.render("o", True, self.TEXT_DIM)
+            self.screen.blit(reset_text, (reset_rect.x + 4, reset_rect.y))
+            # Store reset button rect for click handling
+            self.ge_reset_rects[param] = (reset_rect, default)
+
+            y += 32
+
+        # Bottom buttons
+        cancel_rect = pygame.Rect(modal_x + modal_w - 220, modal_y + modal_h - 45, 100, 30)
+        apply_rect = pygame.Rect(modal_x + modal_w - 110, modal_y + modal_h - 45, 100, 30)
+
+        pygame.draw.rect(self.screen, (60, 60, 70), cancel_rect, border_radius=4)
+        cancel_text = self.font_small.render("Cancel", True, self.TEXT_NORMAL)
+        self.screen.blit(cancel_text, (cancel_rect.centerx - cancel_text.get_width() // 2, cancel_rect.y + 7))
+        self.ge_cancel_rect = cancel_rect
+
+        pygame.draw.rect(self.screen, self.GREEN, apply_rect, border_radius=4)
+        apply_text = self.font_small.render("Apply", True, self.BG_DARKEST)
+        self.screen.blit(apply_text, (apply_rect.centerx - apply_text.get_width() // 2, apply_rect.y + 7))
+        self.ge_apply_rect = apply_rect
+
+    def _apply_genome_changes(self) -> None:
+        """Apply edited genome values to agent."""
+        if not self.genome_editor_agent_id:
+            return
+        if self.genome_editor_agent_id not in self.simulation.agents:
+            return
+
+        wrapper = self.simulation.agents[self.genome_editor_agent_id]
+        genome = wrapper.agent.genome
+
+        for key, value in self.genome_editor_values.items():
+            if hasattr(genome, key):
+                setattr(genome, key, value)
+
+        print(f"Applied genome changes to {self.genome_editor_agent_id[:8]}")
+        self.genome_editor_open = False
 
     def _open_database_browser(self) -> None:
         """Open database browser modal."""
