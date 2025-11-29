@@ -1,0 +1,120 @@
+{
+    "#defaults": {
+        "colours": {
+            "dark_bg": "#0a0a12",
+            "normal_bg": "#1a1a24",
+            "hovered_bg": "#2a2a38",
+            "disabled_bg": "#151520",
+            "normal_text": "#ccccdd",
+            "hovered_text": "#ffffff",
+            "disabled_text": "#555566",
+            "normal_border": "#00aaaa",
+            "hovered_border": "#00ffff"
+        },
+        "font": {
+            "name": "fira_code",
+            "size": "13",
+            "regular_path": "font/FiraCode-Regular.ttf"
+        }
+    },
+    "UIPanel": {
+        "colours": {
+            "dark_bg": "#1a1a24",
+            "normal_bg": "#1a1a24"
+        }
+    },
+    "UIButton": {
+        "colours": {
+            "normal_bg": "#252530",
+            "hovered_bg": "#2a2a38",
+            "active_bg": "#00aaaa",
+            "normal_border": "#00aaaa",
+            "hovered_border": "#00ffff"
+        },
+        "misc": {
+            "border_width": "1",
+            "shape_corner_radius": "4"
+        }
+    },
+    "UIHorizontalSlider": {
+        "colours": {
+            "normal_bg": "#252530",
+            "hovered_bg": "#2a2a38",
+            "normal_border": "#2a2a38"
+        }
+    },
+    "UITextEntryLine": {
+        "colours": {
+            "dark_bg": "#252530",
+            "normal_bg": "#252530",
+            "normal_border": "#2a2a38",
+            "focused_border": "#00ffff"
+        }
+    },
+    "UISelectionList": {
+        "colours": {
+            "dark_bg": "#1a1a24",
+            "normal_bg": "#1a1a24"
+        }
+    },
+    "UIWindow": {
+        "colours": {
+            "dark_bg": "#1a1a24",
+            "normal_bg": "#1a1a24",
+            "normal_border": "#00aaaa"
+        }
+    },
+    "UIDropDownMenu": {
+        "colours": {
+            "normal_bg": "#252530",
+            "hovered_bg": "#2a2a38",
+            "normal_border": "#2a2a38"
+        }
+    },
+    "#reward_button": {
+        "colours": {
+            "normal_bg": "#00aa66",
+            "hovered_bg": "#00ff88",
+            "normal_border": "#00ff88"
+        }
+    },
+    "#punish_button": {
+        "colours": {
+            "normal_bg": "#aa3344",
+            "hovered_bg": "#ff4466",
+            "normal_border": "#ff4466"
+        }
+    },
+    "#tab_button": {
+        "colours": {
+            "normal_bg": "#252530",
+            "selected_bg": "#2a2a38",
+            "normal_border": "#252530",
+            "selected_border": "#00ffff"
+        }
+    },
+    "#status_bar_energy": {
+        "colours": {
+            "filled_bar": "#ffaa00",
+            "unfilled_bar": "#252530"
+        }
+    },
+    "#status_bar_health": {
+        "colours": {
+            "filled_bar": "#00ff88",
+            "unfilled_bar": "#252530"
+        }
+    },
+    "#status_bar_breed": {
+        "colours": {
+            "filled_bar": "#ff66aa",
+            "unfilled_bar": "#252530"
+        }
+    },
+    "#status_bar_social": {
+        "colours": {
+            "filled_bar": "#aa66ff",
+            "unfilled_bar": "#252530"
+        }
+    }
+}
