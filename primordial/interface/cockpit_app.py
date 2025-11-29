@@ -138,6 +138,9 @@ class CockpitApp:
             "tick_rate": self.sim_config.tick_rate,
         }
 
+        # Default genome for new agents (modifiable via Agents tab)
+        self.default_genome = AgentGenome()
+
         # Active slider being dragged
         self.active_slider = None
 
@@ -252,6 +255,18 @@ class CockpitApp:
                             self.active_slider = key
                             break
 
+                # Genome sliders (Agents tab)
+                if self.left_panel_visible and self.left_panel_tab == "agents":
+                    genome_keys = ["genome_max_speed", "genome_max_angular_speed", "genome_thrust_force",
+                                   "genome_radius", "genome_vision_range", "genome_vision_fov",
+                                   "genome_audio_range", "genome_base_energy_cost",
+                                   "genome_movement_energy_mult", "genome_eating_efficiency"]
+                    for key in genome_keys:
+                        rect = getattr(self, f"slider_{key}_rect", None)
+                        if rect and rect.collidepoint(mouse_pos):
+                            self.active_slider = key
+                            break
+
                 # Agent table row clicks - check FIRST to prevent race condition with world click
                 if self.right_panel_visible and hasattr(self, 'agent_table_rows'):
                     for row_rect, agent_id in self.agent_table_rows:
@@ -275,15 +290,21 @@ class CockpitApp:
                     rel_x = max(0, min(event.pos[0] - rect.x, rect.width))
                     pct = rel_x / rect.width
                     new_val = min_val + pct * (max_val - min_val)
-                    # Round integers
-                    if self.active_slider in ["max_agents", "initial_food", "max_food", "predator_count", "tick_rate"]:
-                        new_val = int(round(new_val))
-                    self.control_values[self.active_slider] = new_val
-                    # Apply to config (live update) with validation
-                    if hasattr(self.sim_config, self.active_slider):
-                        setattr(self.sim_config, self.active_slider, new_val)
-                    else:
-                        print(f"Warning: sim_config has no attribute '{self.active_slider}'")
+
+                    # Handle genome sliders
+                    if self.active_slider.startswith("genome_"):
+                        attr_name = self.active_slider.replace("genome_", "")
+                        if hasattr(self.default_genome, attr_name):
+                            setattr(self.default_genome, attr_name, new_val)
+                    # Handle control value sliders
+                    elif self.active_slider in self.control_values:
+                        # Round integers
+                        if self.active_slider in ["max_agents", "initial_food", "max_food", "predator_count", "tick_rate"]:
+                            new_val = int(round(new_val))
+                        self.control_values[self.active_slider] = new_val
+                        # Apply to config (live update) with validation
+                        if hasattr(self.sim_config, self.active_slider):
+                            setattr(self.sim_config, self.active_slider, new_val)
 
             # Pass to pygame-gui
             self.ui_manager.process_events(event)
@@ -702,6 +723,50 @@ class CockpitApp:
 
             y += self._render_slider(x, y, width, "Tick Rate",
                                      self.control_values["tick_rate"], 15, 120, "tick_rate", 60)
+
+        elif self.left_panel_tab == "agents":
+            # PHYSICAL section
+            section = self.font_small.render("PHYSICAL", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Max Speed",
+                                     self.default_genome.max_speed, 50, 300, "genome_max_speed", 150.0)
+            y += self._render_slider(x, y, width, "Max Angular Speed",
+                                     self.default_genome.max_angular_speed, 1.0, 6.0, "genome_max_angular_speed", 3.0)
+            y += self._render_slider(x, y, width, "Thrust Force",
+                                     self.default_genome.thrust_force, 100, 1000, "genome_thrust_force", 500.0)
+            y += self._render_slider(x, y, width, "Radius",
+                                     self.default_genome.radius, 4.0, 20.0, "genome_radius", 8.0)
+            y += 8
+
+            # SENSORY section
+            section = self.font_small.render("SENSORY", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Vision Range",
+                                     self.default_genome.vision_range, 50, 400, "genome_vision_range", 200.0)
+            y += self._render_slider(x, y, width, "Vision FOV",
+                                     self.default_genome.vision_fov, 60, 180, "genome_vision_fov", 120.0)
+            y += self._render_slider(x, y, width, "Audio Range",
+                                     self.default_genome.audio_range, 50, 500, "genome_audio_range", 300.0)
+            y += 8
+
+            # METABOLIC section
+            section = self.font_small.render("METABOLIC", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Base Energy Cost",
+                                     self.default_genome.base_energy_cost, 0.01, 0.5, "genome_base_energy_cost", 0.1)
+            y += self._render_slider(x, y, width, "Movement Energy",
+                                     self.default_genome.movement_energy_mult, 0.1, 2.0, "genome_movement_energy_mult", 0.5)
+            y += self._render_slider(x, y, width, "Eating Efficiency",
+                                     self.default_genome.eating_efficiency, 0.5, 1.5, "genome_eating_efficiency", 0.9)
 
         else:
             # Placeholder for other tabs
