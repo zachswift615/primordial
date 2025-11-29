@@ -98,6 +98,14 @@ class CockpitApp:
             "demonstrations": 0,
         }
 
+        # Button rects (will be set in _render_bottombar)
+        self.reward_btn_rect = pygame.Rect(0, 0, 0, 0)
+        self.punish_btn_rect = pygame.Rect(0, 0, 0, 0)
+        self.pause_btn_rect = pygame.Rect(0, 0, 0, 0)
+
+        # Pause state
+        self.paused = False
+
         # Build UI
         self._build_ui()
 
@@ -122,17 +130,34 @@ class CockpitApp:
                     else:
                         self.left_panel_visible = not self.left_panel_visible
                     self._rebuild_layout()
+                elif event.key == pygame.K_r:
+                    self._send_reward()
+                elif event.key == pygame.K_x:
+                    self._send_punish()
+                elif event.key == pygame.K_p:
+                    self.paused = not self.paused
+
+            # Mouse clicks
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mouse_pos = pygame.mouse.get_pos()
+
+                # Teaching buttons
+                if self.reward_btn_rect.collidepoint(mouse_pos):
+                    self._send_reward()
+                elif self.punish_btn_rect.collidepoint(mouse_pos):
+                    self._send_punish()
+                elif self.pause_btn_rect.collidepoint(mouse_pos):
+                    self.paused = not self.paused
 
             # Pass to pygame-gui
             self.ui_manager.process_events(event)
 
     def _update(self, dt: float) -> None:
         """Update simulation and UI."""
-        # Update simulation
-        scaled_dt = dt * self.time_scale
-        self.simulation.tick(scaled_dt)
+        if not self.paused:
+            scaled_dt = dt * self.time_scale
+            self.simulation.tick(scaled_dt)
 
-        # Update pygame-gui
         self.ui_manager.update(dt)
 
     def _render_world(self) -> None:
@@ -319,12 +344,79 @@ class CockpitApp:
 
     def _render_bottombar(self) -> None:
         """Render HUD bottom bar."""
-        rect = pygame.Rect(0, self.window_height - self.BOTTOMBAR_HEIGHT,
-                          self.window_width, self.BOTTOMBAR_HEIGHT)
+        bar_top = self.window_height - self.BOTTOMBAR_HEIGHT
+        rect = pygame.Rect(0, bar_top, self.window_width, self.BOTTOMBAR_HEIGHT)
         pygame.draw.rect(self.screen, self.BG_DARK, rect)
-        pygame.draw.line(self.screen, self.CYAN_DIM, (0, rect.top), (self.window_width, rect.top))
+        pygame.draw.line(self.screen, self.CYAN_DIM, (0, bar_top), (self.window_width, bar_top))
 
-        # TODO: Render teaching buttons, audio visualizer, etc.
+        x = 16
+
+        # Reward button
+        self.reward_btn_rect = pygame.Rect(x, bar_top + 8, 100, 34)
+        btn_color = (0, 170, 102) if not pygame.mouse.get_pressed()[0] else (0, 255, 136)
+        pygame.draw.rect(self.screen, btn_color, self.reward_btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.GREEN, self.reward_btn_rect, 2, border_radius=4)
+        reward_text = self.font_small.render("REWARD (R)", True, self.BG_DARKEST)
+        text_x = self.reward_btn_rect.centerx - reward_text.get_width() // 2
+        text_y = self.reward_btn_rect.centery - reward_text.get_height() // 2
+        self.screen.blit(reward_text, (text_x, text_y))
+        x += 108
+
+        # Punish button
+        self.punish_btn_rect = pygame.Rect(x, bar_top + 8, 100, 34)
+        btn_color = (170, 51, 68) if not pygame.mouse.get_pressed()[0] else (255, 68, 102)
+        pygame.draw.rect(self.screen, btn_color, self.punish_btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.RED, self.punish_btn_rect, 2, border_radius=4)
+        punish_text = self.font_small.render("PUNISH (X)", True, self.BG_DARKEST)
+        text_x = self.punish_btn_rect.centerx - punish_text.get_width() // 2
+        text_y = self.punish_btn_rect.centery - punish_text.get_height() // 2
+        self.screen.blit(punish_text, (text_x, text_y))
+        x += 120
+
+        # Divider
+        pygame.draw.line(self.screen, (40, 40, 50), (x, bar_top + 8), (x, bar_top + 42))
+        x += 20
+
+        # Audio visualizer placeholder
+        audio_rect = pygame.Rect(x, bar_top + 12, 100, 26)
+        pygame.draw.rect(self.screen, (37, 37, 48), audio_rect, border_radius=4)
+        mic_text = self.font_small.render("MIC", True, self.TEXT_DIM)
+        self.screen.blit(mic_text, (x + 8, bar_top + 16))
+        # Fake bars
+        bar_heights = [4, 8, 14, 20, 12, 6, 10, 4]
+        bar_x = x + 40
+        for h in bar_heights:
+            bar_rect = pygame.Rect(bar_x, bar_top + 12 + (26 - h) // 2, 4, h)
+            pygame.draw.rect(self.screen, self.CYAN, bar_rect, border_radius=2)
+            bar_x += 6
+
+        # Right side buttons
+        x = self.window_width - 260
+
+        # Pause button
+        self.pause_btn_rect = pygame.Rect(x, bar_top + 8, 70, 34)
+        pygame.draw.rect(self.screen, (37, 37, 48), self.pause_btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, self.pause_btn_rect, 1, border_radius=4)
+        pause_label = "Play" if self.paused else "Pause"
+        pause_text = self.font_small.render(pause_label, True, self.TEXT_NORMAL)
+        text_x = self.pause_btn_rect.centerx - pause_text.get_width() // 2
+        self.screen.blit(pause_text, (text_x, bar_top + 16))
+        x += 78
+
+        # Record button (placeholder)
+        rec_rect = pygame.Rect(x, bar_top + 8, 60, 34)
+        pygame.draw.rect(self.screen, (37, 37, 48), rec_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, rec_rect, 1, border_radius=4)
+        rec_text = self.font_small.render("Rec", True, self.TEXT_NORMAL)
+        self.screen.blit(rec_text, (x + 18, bar_top + 16))
+        x += 68
+
+        # Help button
+        help_rect = pygame.Rect(x, bar_top + 8, 50, 34)
+        pygame.draw.rect(self.screen, (37, 37, 48), help_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, help_rect, 1, border_radius=4)
+        help_text = self.font_small.render("?", True, self.TEXT_NORMAL)
+        self.screen.blit(help_text, (x + 20, bar_top + 14))
 
     def _render(self) -> None:
         """Render full frame."""
@@ -341,6 +433,34 @@ class CockpitApp:
         self.ui_manager.draw_ui(self.screen)
 
         pygame.display.flip()
+
+    def _send_reward(self) -> None:
+        """Send reward signal to selected agent."""
+        self.stats["rewards"] += 1
+        wrapper = self._get_target_agent_wrapper()
+        if wrapper:
+            wrapper.events.append('human_reward')
+            print(f"Reward sent to {wrapper.agent_id}")
+
+    def _send_punish(self) -> None:
+        """Send punish signal to selected agent."""
+        self.stats["punishments"] += 1
+        wrapper = self._get_target_agent_wrapper()
+        if wrapper:
+            wrapper.events.append('human_punish')
+            print(f"Punish sent to {wrapper.agent_id}")
+
+    def _get_target_agent_wrapper(self):
+        """Get wrapper for selected agent or first living agent."""
+        if self.selected_agent_id and self.selected_agent_id in self.simulation.agents:
+            wrapper = self.simulation.agents[self.selected_agent_id]
+            if wrapper.agent.is_alive:
+                return wrapper
+
+        for wrapper in self.simulation.agents.values():
+            if wrapper.agent.is_alive:
+                return wrapper
+        return None
 
     def _rebuild_layout(self) -> None:
         """Rebuild UI layout after panel toggle or resize."""
