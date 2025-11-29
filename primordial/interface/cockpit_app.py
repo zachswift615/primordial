@@ -136,6 +136,11 @@ class CockpitApp:
             "max_food": self.sim_config.max_food,
             "predator_count": self.sim_config.predator_count,
             "tick_rate": self.sim_config.tick_rate,
+            # Learning settings
+            "lrn_hidden_dim": self.sim_config.lrn_hidden_dim,
+            "lrn_num_mixing_layers": self.sim_config.lrn_num_mixing_layers,
+            "learning_rate": self.sim_config.learning_rate,
+            "reward_modulation_scale": self.sim_config.reward_modulation_scale,
         }
 
         # Default genome for new agents (modifiable via Agents tab)
@@ -267,6 +272,15 @@ class CockpitApp:
                             self.active_slider = key
                             break
 
+                # Learn tab sliders
+                if self.left_panel_visible and self.left_panel_tab == "learn":
+                    learn_keys = ["lrn_hidden_dim", "lrn_num_mixing_layers", "learning_rate_display", "reward_modulation_scale"]
+                    for key in learn_keys:
+                        rect = getattr(self, f"slider_{key}_rect", None)
+                        if rect and rect.collidepoint(mouse_pos):
+                            self.active_slider = key
+                            break
+
                 # Agent table row clicks - check FIRST to prevent race condition with world click
                 if self.right_panel_visible and hasattr(self, 'agent_table_rows'):
                     for row_rect, agent_id in self.agent_table_rows:
@@ -296,6 +310,17 @@ class CockpitApp:
                         attr_name = self.active_slider.replace("genome_", "")
                         if hasattr(self.default_genome, attr_name):
                             setattr(self.default_genome, attr_name, new_val)
+                    # Special handling for learning rate (convert display value to actual)
+                    elif self.active_slider == "learning_rate_display":
+                        self.control_values["learning_rate"] = new_val / 10000
+                        if hasattr(self.sim_config, "learning_rate"):
+                            self.sim_config.learning_rate = new_val / 10000
+                    # Handle LRN integer sliders
+                    elif self.active_slider in ["lrn_hidden_dim", "lrn_num_mixing_layers"]:
+                        new_val = int(round(new_val))
+                        self.control_values[self.active_slider] = new_val
+                        if hasattr(self.sim_config, self.active_slider):
+                            setattr(self.sim_config, self.active_slider, new_val)
                     # Handle control value sliders
                     elif self.active_slider in self.control_values:
                         # Round integers
@@ -767,6 +792,38 @@ class CockpitApp:
                                      self.default_genome.movement_energy_mult, 0.1, 2.0, "genome_movement_energy_mult", 0.5)
             y += self._render_slider(x, y, width, "Eating Efficiency",
                                      self.default_genome.eating_efficiency, 0.5, 1.5, "genome_eating_efficiency", 0.9)
+
+        elif self.left_panel_tab == "learn":
+            # ARCHITECTURE section
+            section = self.font_small.render("ARCHITECTURE", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Hidden Dim",
+                                     self.control_values["lrn_hidden_dim"], 32, 512, "lrn_hidden_dim", 128)
+            y += self._render_slider(x, y, width, "Mixing Layers",
+                                     self.control_values["lrn_num_mixing_layers"], 2, 12, "lrn_num_mixing_layers", 6)
+            y += 8
+
+            # TRAINING section
+            section = self.font_small.render("TRAINING", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            # Learning rate needs special handling (very small values)
+            lr_display = self.control_values["learning_rate"] * 10000  # Display as 0.1-10
+            y += self._render_slider(x, y, width, "Learning Rate (x10^-4)",
+                                     lr_display, 0.1, 10.0, "learning_rate_display", 1.0)
+            y += self._render_slider(x, y, width, "Reward Scale",
+                                     self.control_values["reward_modulation_scale"], 0.1, 5.0, "reward_modulation_scale", 1.0)
+
+            # Note about live changes
+            note = self.font_small.render("Note: Architecture changes apply", True, self.TEXT_DIM)
+            self.screen.blit(note, (x, y + 16))
+            note2 = self.font_small.render("to new agents only", True, self.TEXT_DIM)
+            self.screen.blit(note2, (x, y + 30))
 
         else:
             # Placeholder for other tabs
