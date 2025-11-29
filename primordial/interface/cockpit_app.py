@@ -1,5 +1,6 @@
 """Cockpit-style teaching interface with comprehensive controls."""
 
+import math
 import pygame
 import pygame_gui
 from pathlib import Path
@@ -131,25 +132,100 @@ class CockpitApp:
 
     def _render_world(self) -> None:
         """Render world view as background."""
-        # Calculate world view area
-        left = self.PANEL_WIDTH if self.left_panel_visible else 0
-        right = self.window_width - (self.PANEL_WIDTH if self.right_panel_visible else 0)
-        top = self.TOPBAR_HEIGHT
-        bottom = self.window_height - self.BOTTOMBAR_HEIGHT
+        # Get transform (uses helper from Task 3.4, or calculate inline for now)
+        if hasattr(self, '_get_world_transform'):
+            world_rect, scale, offset_x, offset_y = self._get_world_transform()
+        else:
+            # Inline calculation (will be replaced by helper in Task 3.4)
+            left = self.PANEL_WIDTH if self.left_panel_visible else 0
+            right = self.window_width - (self.PANEL_WIDTH if self.right_panel_visible else 0)
+            top = self.TOPBAR_HEIGHT
+            bottom = self.window_height - self.BOTTOMBAR_HEIGHT
+            world_rect = pygame.Rect(left, top, right - left, bottom - top)
+            scale_x = world_rect.width / self.simulation.world.width
+            scale_y = world_rect.height / self.simulation.world.height
+            scale = min(scale_x, scale_y)
+            offset_x = world_rect.left + (world_rect.width - self.simulation.world.width * scale) / 2
+            offset_y = world_rect.top + (world_rect.height - self.simulation.world.height * scale) / 2
 
-        world_rect = pygame.Rect(left, top, right - left, bottom - top)
-
-        # Draw grid background
+        # Draw background
         pygame.draw.rect(self.screen, self.BG_DARKEST, world_rect)
 
         # Draw grid lines
         grid_size = 50
+        grid_color = (15, 25, 25)
         for x in range(world_rect.left, world_rect.right, grid_size):
-            pygame.draw.line(self.screen, (20, 30, 30), (x, world_rect.top), (x, world_rect.bottom))
+            pygame.draw.line(self.screen, grid_color, (x, world_rect.top), (x, world_rect.bottom))
         for y in range(world_rect.top, world_rect.bottom, grid_size):
-            pygame.draw.line(self.screen, (20, 30, 30), (world_rect.left, y), (world_rect.right, y))
+            pygame.draw.line(self.screen, grid_color, (world_rect.left, y), (world_rect.right, y))
 
-        # TODO: Render entities (agents, food, predators, etc.)
+        def world_to_screen(pos):
+            return (int(offset_x + pos.x * scale), int(offset_y + pos.y * scale))
+
+        # Render water bodies
+        from primordial.world.entities import Water
+        for entity in self.simulation.world.static_entities:
+            if isinstance(entity, Water):
+                pos = world_to_screen(entity.position)
+                radius = int(entity.radius * scale)
+                pygame.draw.circle(self.screen, (50, 100, 180), pos, radius)
+                pygame.draw.circle(self.screen, (70, 130, 200), pos, radius, 2)
+
+        # Render vegetation
+        for veg in self.simulation.world.vegetation:
+            pos = world_to_screen(veg.position)
+            radius = int(veg.radius * scale)
+            pygame.draw.circle(self.screen, (30, 80, 30), pos, radius)
+
+        # Render food
+        for food in self.simulation.world.food_items:
+            if food.is_active:
+                pos = world_to_screen(food.position)
+                radius = max(4, int(food.radius * scale))
+                pygame.draw.circle(self.screen, self.GREEN, pos, radius)
+                # Glow effect
+                pygame.draw.circle(self.screen, (0, 200, 100), pos, radius + 2, 1)
+
+        # Render predators
+        for predator in self.simulation.world.predators:
+            if predator.is_active:
+                pos = world_to_screen(predator.position)
+                # Get angle from velocity
+                angle = 0
+                if hasattr(predator, 'velocity') and predator.velocity.magnitude() > 0.1:
+                    angle = math.atan2(predator.velocity.y, predator.velocity.x)
+
+                # Draw triangle pointing in direction
+                size = max(8, int(predator.radius * scale))
+                points = [
+                    (pos[0] + math.cos(angle) * size, pos[1] + math.sin(angle) * size),
+                    (pos[0] + math.cos(angle + 2.4) * size * 0.7, pos[1] + math.sin(angle + 2.4) * size * 0.7),
+                    (pos[0] + math.cos(angle - 2.4) * size * 0.7, pos[1] + math.sin(angle - 2.4) * size * 0.7),
+                ]
+                pygame.draw.polygon(self.screen, self.RED, points)
+
+        # Render agents
+        for agent_id, wrapper in self.simulation.agents.items():
+            if wrapper.agent.is_alive:
+                agent = wrapper.agent
+                pos = world_to_screen(agent.position)
+                radius = max(6, int(agent.radius * scale))
+
+                # Agent color (highlight if selected)
+                color = (100, 200, 255)
+                if agent_id == self.selected_agent_id:
+                    color = self.CYAN
+                    # Selection ring
+                    pygame.draw.circle(self.screen, self.CYAN, pos, radius + 4, 2)
+
+                # Body
+                pygame.draw.circle(self.screen, color, pos, radius)
+                pygame.draw.circle(self.screen, self.TEXT_BRIGHT, pos, radius, 1)
+
+                # Direction indicator
+                end_x = pos[0] + math.cos(agent.angle) * radius * 1.5
+                end_y = pos[1] + math.sin(agent.angle) * radius * 1.5
+                pygame.draw.line(self.screen, self.TEXT_BRIGHT, pos, (end_x, end_y), 2)
 
     def _render_topbar(self) -> None:
         """Render HUD top bar."""
