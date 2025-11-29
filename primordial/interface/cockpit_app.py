@@ -58,6 +58,8 @@ class CockpitApp:
         self.right_panel_visible = True
         self.selected_agent_id: Optional[str] = None
         self.time_scale = 1.0
+        self.time_scale_min = 0.25
+        self.time_scale_max = 4.0
 
         # Left panel tab state
         self.left_panel_tab = "world"  # world, agents, learn, rewards, predators, presets
@@ -157,6 +159,16 @@ class CockpitApp:
                     self._send_punish()
                 elif event.key == pygame.K_p:
                     self.paused = not self.paused
+                # Time scale controls
+                elif event.key == pygame.K_LEFTBRACKET:  # [ = slow down
+                    self.time_scale = max(self.time_scale_min, self.time_scale / 1.5)
+                    print(f"Time scale: {self.time_scale:.2f}x")
+                elif event.key == pygame.K_RIGHTBRACKET:  # ] = speed up
+                    self.time_scale = min(self.time_scale_max, self.time_scale * 1.5)
+                    print(f"Time scale: {self.time_scale:.2f}x")
+                elif event.key == pygame.K_BACKSLASH:  # \ = reset
+                    self.time_scale = 1.0
+                    print(f"Time scale: {self.time_scale:.2f}x (reset)")
 
             # Mouse clicks
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
