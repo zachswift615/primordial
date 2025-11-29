@@ -188,6 +188,13 @@ class CockpitApp:
                             self.active_slider = key
                             break
 
+                # Agent table row clicks
+                if self.right_panel_visible and hasattr(self, 'agent_table_rows'):
+                    for row_rect, agent_id in self.agent_table_rows:
+                        if row_rect.collidepoint(mouse_pos):
+                            self.selected_agent_id = agent_id
+                            break
+
             if event.type == pygame.MOUSEBUTTONUP:
                 self.active_slider = None
 
@@ -622,6 +629,195 @@ class CockpitApp:
             content_text = self.font_small.render(f"[{self.left_panel_tab.upper()} controls]", True, self.TEXT_DIM)
             self.screen.blit(content_text, (x, y + 16))
 
+    def _render_right_panel(self) -> None:
+        """Render right agent panel."""
+        if not self.right_panel_visible:
+            # Draw expand button
+            btn_x = self.window_width - 32
+            btn_rect = pygame.Rect(btn_x, self.TOPBAR_HEIGHT + 8, 24, 24)
+            pygame.draw.rect(self.screen, self.BG_PANEL, btn_rect, border_radius=4)
+            pygame.draw.rect(self.screen, self.CYAN_DIM, btn_rect, 1, border_radius=4)
+            arrow = self.font_small.render("<", True, self.CYAN)
+            self.screen.blit(arrow, (btn_rect.x + 8, btn_rect.y + 4))
+            return
+
+        panel_height = self.window_height - self.TOPBAR_HEIGHT - self.BOTTOMBAR_HEIGHT
+        panel_x = self.window_width - self.PANEL_WIDTH
+        panel_rect = pygame.Rect(panel_x, self.TOPBAR_HEIGHT, self.PANEL_WIDTH, panel_height)
+
+        # Panel background
+        pygame.draw.rect(self.screen, self.BG_PANEL, panel_rect)
+        pygame.draw.line(self.screen, self.CYAN_DIM,
+                        (panel_x, self.TOPBAR_HEIGHT),
+                        (panel_x, self.window_height - self.BOTTOMBAR_HEIGHT))
+
+        # Header
+        header_rect = pygame.Rect(panel_x, self.TOPBAR_HEIGHT, self.PANEL_WIDTH, 36)
+        pygame.draw.rect(self.screen, self.BG_DARK, header_rect)
+        pygame.draw.line(self.screen, self.CYAN_DIM, (panel_x, header_rect.bottom), (panel_x + self.PANEL_WIDTH, header_rect.bottom))
+
+        title = self.font_small.render("AGENTS", True, self.CYAN)
+        self.screen.blit(title, (panel_x + 12, self.TOPBAR_HEIGHT + 10))
+
+        # Collapse button
+        btn_rect = pygame.Rect(panel_x + self.PANEL_WIDTH - 32, self.TOPBAR_HEIGHT + 6, 24, 24)
+        pygame.draw.rect(self.screen, (37, 37, 48), btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, btn_rect, 1, border_radius=4)
+        arrow = self.font_small.render(">", True, self.TEXT_DIM)
+        self.screen.blit(arrow, (btn_rect.x + 8, btn_rect.y + 4))
+
+        # Agent table
+        self._render_agent_table(panel_x + 8, self.TOPBAR_HEIGHT + 44)
+
+    def _render_agent_table(self, x: int, y: int) -> None:
+        """Render agent table."""
+        width = self.PANEL_WIDTH - 16
+
+        # Column headers
+        cols = ["#", "E", "H", "Age", "Gen", "Food"]
+        col_widths = [24, 36, 36, 48, 36, 36]
+        col_x = x
+
+        pygame.draw.rect(self.screen, self.BG_DARK, pygame.Rect(x, y, width, 20))
+
+        for col, cw in zip(cols, col_widths):
+            header = self.font_small.render(col, True, self.TEXT_DIM)
+            self.screen.blit(header, (col_x + 4, y + 2))
+            col_x += cw
+
+        y += 22
+
+        # Get agent data sorted by alive then age
+        agents_data = []
+        for agent_id, wrapper in self.simulation.agents.items():
+            agent = wrapper.agent
+            agents_data.append({
+                'id': agent_id,
+                'alive': agent.is_alive,
+                'energy': agent.energy / agent.genome.max_energy if agent.is_alive else 0,
+                'health': agent.health / agent.genome.max_health if agent.is_alive else 0,
+                'age': agent.age,
+                'generation': wrapper.generation,
+                'food': wrapper.lifetime_stats.get('total_food_eaten', 0),
+            })
+
+        agents_data.sort(key=lambda a: (-int(a['alive']), -a['age']))
+
+        # Store row rects for click detection
+        self.agent_table_rows = []
+
+        # Render rows (max 10)
+        for i, agent in enumerate(agents_data[:10]):
+            row_rect = pygame.Rect(x, y, width, 20)
+            self.agent_table_rows.append((row_rect, agent['id']))
+
+            # Highlight selected
+            if agent['id'] == self.selected_agent_id:
+                pygame.draw.rect(self.screen, (42, 42, 56), row_rect)
+                pygame.draw.line(self.screen, self.CYAN, (x, y), (x, y + 20), 3)
+
+            # Dim dead agents
+            text_color = self.TEXT_DIM if not agent['alive'] else self.TEXT_NORMAL
+
+            col_x = x
+            # Slot number
+            slot = self.font_small.render(str(i + 1), True, text_color)
+            self.screen.blit(slot, (col_x + 4, y + 2))
+            col_x += col_widths[0]
+
+            # Energy
+            if agent['alive']:
+                e_text = f"{int(agent['energy'] * 100)}%"
+            else:
+                e_text = "--"
+            energy = self.font_small.render(e_text, True, text_color)
+            self.screen.blit(energy, (col_x + 2, y + 2))
+            col_x += col_widths[1]
+
+            # Health
+            if agent['alive']:
+                h_text = f"{int(agent['health'] * 100)}"
+            else:
+                h_text = "DEAD"
+            health = self.font_small.render(h_text, True, text_color)
+            self.screen.blit(health, (col_x + 2, y + 2))
+            col_x += col_widths[2]
+
+            # Age
+            if agent['alive']:
+                age_text = f"{int(agent['age'])}s"
+            else:
+                age_text = "--"
+            age = self.font_small.render(age_text, True, text_color)
+            self.screen.blit(age, (col_x + 2, y + 2))
+            col_x += col_widths[3]
+
+            # Generation
+            gen = self.font_small.render(str(agent['generation']), True, text_color)
+            self.screen.blit(gen, (col_x + 2, y + 2))
+            col_x += col_widths[4]
+
+            # Food
+            food = self.font_small.render(str(agent['food']), True, text_color)
+            self.screen.blit(food, (col_x + 2, y + 2))
+
+            y += 22
+
+        # Selected agent detail section
+        self._render_selected_agent_detail(x, y + 16)
+
+    def _render_selected_agent_detail(self, x: int, y: int) -> None:
+        """Render selected agent detail panel."""
+        width = self.PANEL_WIDTH - 16
+
+        # Section header
+        pygame.draw.rect(self.screen, self.BG_DARK, pygame.Rect(x - 8, y, self.PANEL_WIDTH, 28))
+        pygame.draw.line(self.screen, self.CYAN_DIM, (x - 8, y), (x + width + 8, y))
+
+        wrapper = self._get_target_agent_wrapper()
+        if wrapper:
+            title = self.font_small.render(f"SELECTED: {wrapper.agent_id[:8]}", True, self.CYAN)
+        else:
+            title = self.font_small.render("SELECTED: None", True, self.TEXT_DIM)
+        self.screen.blit(title, (x, y + 6))
+
+        y += 36
+
+        if not wrapper:
+            return
+
+        agent = wrapper.agent
+
+        # Status bars
+        bars = [
+            ("Energy", agent.energy / agent.genome.max_energy, (255, 170, 0)),
+            ("Health", agent.health / agent.genome.max_health, (0, 255, 136)),
+            ("Breed", agent.breeding_drive, (255, 102, 170)),
+            ("Social", agent.social_connection, (170, 102, 255)),
+        ]
+
+        for label, value, color in bars:
+            # Label
+            lbl = self.font_small.render(label, True, self.TEXT_NORMAL)
+            self.screen.blit(lbl, (x, y))
+
+            # Value
+            val = self.font_small.render(f"{int(value * 100)}%", True, self.TEXT_BRIGHT)
+            self.screen.blit(val, (x + width - val.get_width(), y))
+
+            y += 14
+
+            # Bar track
+            track_rect = pygame.Rect(x, y, width, 8)
+            pygame.draw.rect(self.screen, (37, 37, 48), track_rect, border_radius=4)
+
+            # Bar fill
+            fill_width = int(width * value)
+            fill_rect = pygame.Rect(x, y, fill_width, 8)
+            pygame.draw.rect(self.screen, color, fill_rect, border_radius=4)
+
+            y += 14
+
     def _render(self) -> None:
         """Render full frame."""
         self.screen.fill(self.BG_DARKEST)
@@ -635,6 +831,7 @@ class CockpitApp:
 
         # Render side panels
         self._render_left_panel()
+        self._render_right_panel()
 
         # Render pygame-gui
         self.ui_manager.draw_ui(self.screen)
