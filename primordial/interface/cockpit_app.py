@@ -173,6 +173,12 @@ class CockpitApp:
         # Active slider being dragged
         self.active_slider = None
 
+        # Agent table sort/filter state
+        self.agent_sort_key = "age"  # age, energy, health, gen, food
+        self.agent_filter = "all"    # all, alive, dead
+        self.sort_dropdown_open = False
+        self.filter_dropdown_open = False
+
         # User data directory for saves (must be before presets)
         self.user_data_dir = Path.home() / ".primordial"
         self.user_data_dir.mkdir(exist_ok=True)
@@ -352,6 +358,39 @@ class CockpitApp:
                     if hasattr(self, 'save_preset_btn_rect') and self.save_preset_btn_rect.collidepoint(mouse_pos):
                         name = f"Custom_{datetime.now().strftime('%H%M%S')}"
                         self._save_current_as_preset(name)
+
+                # Sort dropdown toggle
+                if hasattr(self, 'sort_dropdown_rect') and self.sort_dropdown_rect.collidepoint(mouse_pos):
+                    self.sort_dropdown_open = not self.sort_dropdown_open
+                    self.filter_dropdown_open = False
+                    return
+
+                # Filter dropdown toggle
+                if hasattr(self, 'filter_dropdown_rect') and self.filter_dropdown_rect.collidepoint(mouse_pos):
+                    self.filter_dropdown_open = not self.filter_dropdown_open
+                    self.sort_dropdown_open = False
+                    return
+
+                # Sort option selection
+                if self.sort_dropdown_open and hasattr(self, 'sort_option_rects'):
+                    for rect, opt in self.sort_option_rects:
+                        if rect.collidepoint(mouse_pos):
+                            self.agent_sort_key = opt
+                            self.sort_dropdown_open = False
+                            return
+
+                # Filter option selection
+                if self.filter_dropdown_open and hasattr(self, 'filter_option_rects'):
+                    for rect, opt in self.filter_option_rects:
+                        if rect.collidepoint(mouse_pos):
+                            self.agent_filter = opt
+                            self.filter_dropdown_open = False
+                            return
+
+                # Close dropdowns on click elsewhere
+                if self.sort_dropdown_open or self.filter_dropdown_open:
+                    self.sort_dropdown_open = False
+                    self.filter_dropdown_open = False
 
                 # Agent table row clicks - check FIRST to prevent race condition with world click
                 if self.right_panel_visible and hasattr(self, 'agent_table_rows'):
@@ -1118,6 +1157,28 @@ class CockpitApp:
         """Render agent table."""
         width = self.PANEL_WIDTH - 16
 
+        # Sort/Filter dropdowns
+        sort_x = x
+        filter_x = x + 90
+
+        # Sort dropdown button
+        sort_rect = pygame.Rect(sort_x, y, 80, 18)
+        pygame.draw.rect(self.screen, (37, 37, 48), sort_rect, border_radius=3)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, sort_rect, 1, border_radius=3)
+        sort_label = self.font_small.render(f"Sort: {self.agent_sort_key}", True, self.TEXT_NORMAL)
+        self.screen.blit(sort_label, (sort_x + 4, y + 2))
+        self.sort_dropdown_rect = sort_rect
+
+        # Filter dropdown button
+        filter_rect = pygame.Rect(filter_x, y, 80, 18)
+        pygame.draw.rect(self.screen, (37, 37, 48), filter_rect, border_radius=3)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, filter_rect, 1, border_radius=3)
+        filter_label = self.font_small.render(f"Show: {self.agent_filter}", True, self.TEXT_NORMAL)
+        self.screen.blit(filter_label, (filter_x + 4, y + 2))
+        self.filter_dropdown_rect = filter_rect
+
+        y += 22
+
         # Column headers
         cols = ["#", "E", "H", "Age", "Gen", "Food"]
         col_widths = [24, 36, 36, 48, 36, 36]
@@ -1132,7 +1193,7 @@ class CockpitApp:
 
         y += 22
 
-        # Get agent data sorted by alive then age
+        # Get agent data
         agents_data = []
         for agent_id, wrapper in self.simulation.agents.items():
             agent = wrapper.agent
@@ -1146,7 +1207,21 @@ class CockpitApp:
                 'food': wrapper.lifetime_stats.get('total_food_eaten', 0),
             })
 
-        agents_data.sort(key=lambda a: (-int(a['alive']), -a['age']))
+        # Sort based on current sort key
+        sort_funcs = {
+            "age": lambda a: (-int(a['alive']), -a['age']),
+            "energy": lambda a: (-int(a['alive']), -a['energy']),
+            "health": lambda a: (-int(a['alive']), -a['health']),
+            "gen": lambda a: (-int(a['alive']), -a['generation']),
+            "food": lambda a: (-int(a['alive']), -a['food']),
+        }
+        agents_data.sort(key=sort_funcs.get(self.agent_sort_key, sort_funcs["age"]))
+
+        # Filter
+        if self.agent_filter == "alive":
+            agents_data = [a for a in agents_data if a['alive']]
+        elif self.agent_filter == "dead":
+            agents_data = [a for a in agents_data if not a['alive']]
 
         # Store row rects for click detection
         self.agent_table_rows = []
@@ -1207,6 +1282,35 @@ class CockpitApp:
             self.screen.blit(food, (col_x + 2, y + 2))
 
             y += 22
+
+        # Render dropdown menus (on top of table)
+        if self.sort_dropdown_open:
+            sort_options = ["age", "energy", "health", "gen", "food"]
+            menu_y = self.sort_dropdown_rect.bottom + 2
+            self.sort_option_rects = []
+            for opt in sort_options:
+                opt_rect = pygame.Rect(sort_x, menu_y, 80, 20)
+                bg = (50, 50, 60) if opt == self.agent_sort_key else (37, 37, 48)
+                pygame.draw.rect(self.screen, bg, opt_rect)
+                pygame.draw.rect(self.screen, self.TEXT_DIM, opt_rect, 1)
+                opt_text = self.font_small.render(opt.capitalize(), True, self.TEXT_NORMAL)
+                self.screen.blit(opt_text, (sort_x + 4, menu_y + 2))
+                self.sort_option_rects.append((opt_rect, opt))
+                menu_y += 20
+
+        if self.filter_dropdown_open:
+            filter_options = ["all", "alive", "dead"]
+            menu_y = self.filter_dropdown_rect.bottom + 2
+            self.filter_option_rects = []
+            for opt in filter_options:
+                opt_rect = pygame.Rect(filter_x, menu_y, 80, 20)
+                bg = (50, 50, 60) if opt == self.agent_filter else (37, 37, 48)
+                pygame.draw.rect(self.screen, bg, opt_rect)
+                pygame.draw.rect(self.screen, self.TEXT_DIM, opt_rect, 1)
+                opt_text = self.font_small.render(opt.capitalize(), True, self.TEXT_NORMAL)
+                self.screen.blit(opt_text, (filter_x + 4, menu_y + 2))
+                self.filter_option_rects.append((opt_rect, opt))
+                menu_y += 20
 
         # Selected agent detail section
         self._render_selected_agent_detail(x, y + 16)
