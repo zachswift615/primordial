@@ -187,6 +187,14 @@ class CockpitApp:
         self.genome_editor_open = False
         self.database_browser_open = False
 
+        # Database browser state
+        self.DB_AGENTS_PER_PAGE = 8  # Constant for pagination
+        self.db_page = 0
+        self.db_selected_id = None
+        self.db_search_text = ""
+        self.db_favorites_only = False
+        self.db_agents_cache = []
+
         # User data directory for saves (must be before presets)
         self.user_data_dir = Path.home() / ".primordial"
         self.user_data_dir.mkdir(exist_ok=True)
@@ -282,6 +290,10 @@ class CockpitApp:
             # Mouse clicks
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 mouse_pos = pygame.mouse.get_pos()
+
+                # Database browser modal (check first - highest priority)
+                if self._handle_database_browser_click(mouse_pos):
+                    continue
 
                 # Help modal close button
                 if self.help_modal_open and hasattr(self, 'help_modal_close_btn_rect'):
@@ -1655,6 +1667,9 @@ class CockpitApp:
         # Render help modal (on top of everything)
         self._render_help_modal()
 
+        # Render database browser modal (on top of everything)
+        self._render_database_browser()
+
         pygame.display.flip()
 
     def _send_reward(self) -> None:
@@ -1838,8 +1853,295 @@ class CockpitApp:
         print("Genome editor not yet implemented (Phase 6)")
 
     def _open_database_browser(self) -> None:
-        """Open database browser modal (placeholder for future implementation)."""
-        print("Database browser not yet implemented (Phase 6)")
+        """Open database browser modal."""
+        self.database_browser_open = True
+        self.db_page = 0
+        self.db_selected_id = None
+        self._refresh_db_cache()
+
+    def _refresh_db_cache(self) -> None:
+        """Refresh the cached agent list from database."""
+        self.db_agents_cache = self.agent_db.list_agents(
+            order_by='longest_life',
+            limit=100
+        )
+
+    def _render_database_browser(self) -> None:
+        """Render database browser modal."""
+        if not self.database_browser_open:
+            return
+
+        # Semi-transparent dark overlay
+        overlay = pygame.Surface((self.window_width, self.window_height), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        self.screen.blit(overlay, (0, 0))
+
+        # Modal dimensions
+        modal_w, modal_h = 650, 500
+        modal_x = (self.window_width - modal_w) // 2
+        modal_y = (self.window_height - modal_h) // 2
+        modal_rect = pygame.Rect(modal_x, modal_y, modal_w, modal_h)
+
+        # Modal background
+        pygame.draw.rect(self.screen, self.BG_PANEL, modal_rect, border_radius=8)
+        pygame.draw.rect(self.screen, self.CYAN, modal_rect, 2, border_radius=8)
+
+        # Title
+        title = self.font_large.render("Agent Database", True, self.CYAN)
+        title_rect = title.get_rect(center=(self.window_width // 2, modal_y + 30))
+        self.screen.blit(title, title_rect)
+
+        # Close button (X in top-right)
+        close_btn_size = 28
+        close_btn_x = modal_x + modal_w - close_btn_size - 10
+        close_btn_y = modal_y + 10
+        self.db_close_btn_rect = pygame.Rect(close_btn_x, close_btn_y, close_btn_size, close_btn_size)
+        pygame.draw.rect(self.screen, (60, 60, 70), self.db_close_btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, self.db_close_btn_rect, 1, border_radius=4)
+        close_text = self.font_small.render("X", True, self.TEXT_BRIGHT)
+        self.screen.blit(close_text, (close_btn_x + 9, close_btn_y + 6))
+
+        # Agent list area
+        list_y = modal_y + 60
+        list_h = 320
+
+        # Column headers
+        col_x = modal_x + 15
+        col_widths = [30, 200, 50, 60, 60, 80]  # Star, Name, Gen, Life, Food, Saved
+        col_labels = ["", "Name", "Gen", "Life", "Food", "Saved"]
+
+        header_y = list_y
+        pygame.draw.rect(self.screen, self.BG_DARK, pygame.Rect(modal_x + 10, header_y, modal_w - 20, 20))
+
+        x_pos = col_x
+        for i, label in enumerate(col_labels):
+            header_text = self.font_small.render(label, True, self.TEXT_DIM)
+            self.screen.blit(header_text, (x_pos, header_y + 2))
+            x_pos += col_widths[i]
+
+        # Agent rows
+        self.db_row_rects = []
+        start_idx = self.db_page * self.DB_AGENTS_PER_PAGE
+        end_idx = min(start_idx + self.DB_AGENTS_PER_PAGE, len(self.db_agents_cache))
+        page_agents = self.db_agents_cache[start_idx:end_idx]
+
+        row_y = header_y + 24
+        row_height = 36
+
+        for i, agent in enumerate(page_agents):
+            row_rect = pygame.Rect(modal_x + 10, row_y, modal_w - 20, row_height)
+            self.db_row_rects.append((row_rect, agent.id))
+
+            # Highlight selected row
+            if agent.id == self.db_selected_id:
+                pygame.draw.rect(self.screen, (50, 80, 100), row_rect)
+            elif i % 2 == 0:
+                pygame.draw.rect(self.screen, (30, 30, 40), row_rect)
+
+            # Row border
+            pygame.draw.rect(self.screen, self.TEXT_DIM, row_rect, 1)
+
+            # Star (favorite)
+            star_x = col_x
+            star_color = self.YELLOW if agent.is_favorite else self.TEXT_DIM
+            star_text = self.font_small.render("★" if agent.is_favorite else "☆", True, star_color)
+            self.screen.blit(star_text, (star_x, row_y + 8))
+
+            # Name
+            name_x = star_x + col_widths[0]
+            name_text = self.font_small.render(agent.name[:25], True, self.TEXT_NORMAL)
+            self.screen.blit(name_text, (name_x, row_y + 8))
+
+            # Generation
+            gen_x = name_x + col_widths[1]
+            gen_text = self.font_small.render(str(agent.generation), True, self.TEXT_NORMAL)
+            self.screen.blit(gen_text, (gen_x, row_y + 8))
+
+            # Longest Life
+            life_x = gen_x + col_widths[2]
+            life_str = f"{int(agent.longest_life)}s"
+            life_text = self.font_small.render(life_str, True, self.TEXT_NORMAL)
+            self.screen.blit(life_text, (life_x, row_y + 8))
+
+            # Food Eaten
+            food_x = life_x + col_widths[3]
+            food_text = self.font_small.render(str(agent.total_food_eaten), True, self.TEXT_NORMAL)
+            self.screen.blit(food_text, (food_x, row_y + 8))
+
+            # Saved Date
+            saved_x = food_x + col_widths[4]
+            saved_date = datetime.fromtimestamp(agent.saved_at)
+            date_str = saved_date.strftime("%m/%d/%y")
+            saved_text = self.font_small.render(date_str, True, self.TEXT_DIM)
+            self.screen.blit(saved_text, (saved_x, row_y + 8))
+
+            row_y += row_height
+
+        # Pagination controls
+        pagination_y = modal_y + modal_h - 80
+        total_pages = (len(self.db_agents_cache) + self.DB_AGENTS_PER_PAGE - 1) // self.DB_AGENTS_PER_PAGE
+        current_page = self.db_page + 1
+
+        # Prev button
+        prev_btn_x = modal_x + 20
+        self.db_prev_btn_rect = pygame.Rect(prev_btn_x, pagination_y, 60, 26)
+        prev_enabled = self.db_page > 0
+        prev_bg = (50, 50, 60) if prev_enabled else (30, 30, 35)
+        pygame.draw.rect(self.screen, prev_bg, self.db_prev_btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, self.db_prev_btn_rect, 1, border_radius=4)
+        prev_text = self.font_small.render("Prev", True, self.TEXT_NORMAL if prev_enabled else self.TEXT_DIM)
+        self.screen.blit(prev_text, (prev_btn_x + 12, pagination_y + 5))
+
+        # Page indicator
+        page_text = self.font_small.render(f"Page {current_page} / {max(1, total_pages)}", True, self.TEXT_NORMAL)
+        page_rect = page_text.get_rect(center=(modal_x + modal_w // 2, pagination_y + 13))
+        self.screen.blit(page_text, page_rect)
+
+        # Next button
+        next_btn_x = modal_x + modal_w - 80
+        self.db_next_btn_rect = pygame.Rect(next_btn_x, pagination_y, 60, 26)
+        next_enabled = current_page < total_pages
+        next_bg = (50, 50, 60) if next_enabled else (30, 30, 35)
+        pygame.draw.rect(self.screen, next_bg, self.db_next_btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, self.db_next_btn_rect, 1, border_radius=4)
+        next_text = self.font_small.render("Next", True, self.TEXT_NORMAL if next_enabled else self.TEXT_DIM)
+        self.screen.blit(next_text, (next_btn_x + 12, pagination_y + 5))
+
+        # Bottom buttons (Load and Delete)
+        bottom_btn_y = modal_y + modal_h - 45
+        btn_width = 80
+
+        # Load button
+        load_btn_x = modal_x + modal_w // 2 - btn_width - 10
+        self.db_load_btn_rect = pygame.Rect(load_btn_x, bottom_btn_y, btn_width, 30)
+        load_enabled = self.db_selected_id is not None
+        load_bg = self.GREEN if load_enabled else (30, 30, 35)
+        pygame.draw.rect(self.screen, load_bg, self.db_load_btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, self.db_load_btn_rect, 1, border_radius=4)
+        load_text = self.font_small.render("Load", True, self.TEXT_BRIGHT if load_enabled else self.TEXT_DIM)
+        load_text_rect = load_text.get_rect(center=self.db_load_btn_rect.center)
+        self.screen.blit(load_text, load_text_rect)
+
+        # Delete button
+        delete_btn_x = modal_x + modal_w // 2 + 10
+        self.db_delete_btn_rect = pygame.Rect(delete_btn_x, bottom_btn_y, btn_width, 30)
+        delete_enabled = self.db_selected_id is not None
+        delete_bg = self.RED if delete_enabled else (30, 30, 35)
+        pygame.draw.rect(self.screen, delete_bg, self.db_delete_btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, self.db_delete_btn_rect, 1, border_radius=4)
+        delete_text = self.font_small.render("Delete", True, self.TEXT_BRIGHT if delete_enabled else self.TEXT_DIM)
+        delete_text_rect = delete_text.get_rect(center=self.db_delete_btn_rect.center)
+        self.screen.blit(delete_text, delete_text_rect)
+
+    def _handle_database_browser_click(self, mouse_pos: tuple) -> bool:
+        """Handle clicks in database browser modal.
+
+        Args:
+            mouse_pos: (x, y) position of mouse click
+
+        Returns:
+            True if click was handled by modal, False otherwise
+        """
+        if not self.database_browser_open:
+            return False
+
+        # Close button
+        if hasattr(self, 'db_close_btn_rect') and self.db_close_btn_rect.collidepoint(mouse_pos):
+            self.database_browser_open = False
+            return True
+
+        # Row selection
+        if hasattr(self, 'db_row_rects'):
+            for row_rect, agent_id in self.db_row_rects:
+                if row_rect.collidepoint(mouse_pos):
+                    self.db_selected_id = agent_id
+                    return True
+
+        # Pagination buttons
+        if hasattr(self, 'db_prev_btn_rect') and self.db_prev_btn_rect.collidepoint(mouse_pos):
+            if self.db_page > 0:
+                self.db_page -= 1
+                self.db_selected_id = None
+            return True
+
+        if hasattr(self, 'db_next_btn_rect') and self.db_next_btn_rect.collidepoint(mouse_pos):
+            total_pages = (len(self.db_agents_cache) + self.DB_AGENTS_PER_PAGE - 1) // self.DB_AGENTS_PER_PAGE
+            if self.db_page < total_pages - 1:
+                self.db_page += 1
+                self.db_selected_id = None
+            return True
+
+        # Load button
+        if hasattr(self, 'db_load_btn_rect') and self.db_load_btn_rect.collidepoint(mouse_pos):
+            if self.db_selected_id is not None:
+                self._load_agent_from_database(self.db_selected_id)
+                self.database_browser_open = False
+            return True
+
+        # Delete button
+        if hasattr(self, 'db_delete_btn_rect') and self.db_delete_btn_rect.collidepoint(mouse_pos):
+            if self.db_selected_id is not None:
+                self._delete_agent_from_database(self.db_selected_id)
+            return True
+
+        return True  # Consume all clicks in modal area
+
+    def _load_agent_from_database(self, agent_id: int) -> None:
+        """Load an agent from the database into the simulation.
+
+        Args:
+            agent_id: Database ID of the agent to load
+        """
+        try:
+            # Find a dead slot to load into
+            dead_wrapper = None
+            for w in self.simulation.agents.values():
+                if not w.agent.is_alive:
+                    dead_wrapper = w
+                    break
+
+            if dead_wrapper is None:
+                print("No dead slots available to load agent")
+                return
+
+            # Get agent record from database
+            agent_record = self.agent_db.get_agent(agent_id)
+            if not agent_record:
+                print(f"Agent {agent_id} not found in database")
+                return
+
+            # Load the agent into the dead wrapper
+            if self.agent_db.load_agent_into_wrapper(agent_record.id, dead_wrapper):
+                self.simulation.world.add_entity(dead_wrapper.agent)
+                print(f"Loaded agent '{agent_record.name}' (Gen {agent_record.generation}) from database")
+                # Select the newly loaded agent
+                self.selected_agent_id = dead_wrapper.agent_id
+            else:
+                print(f"Failed to load agent '{agent_record.name}' from database")
+        except Exception as e:
+            print(f"Error loading agent from database: {e}")
+
+    def _delete_agent_from_database(self, agent_id: int) -> None:
+        """Delete an agent from the database.
+
+        Args:
+            agent_id: Database ID of the agent to delete
+        """
+        try:
+            # Get agent name before deleting for message
+            agent_record = self.agent_db.get_agent(agent_id)
+            if agent_record:
+                self.agent_db.delete_agent(agent_id)
+                print(f"Deleted agent '{agent_record.name}' from database")
+                # Refresh cache and clear selection
+                self._refresh_db_cache()
+                self.db_selected_id = None
+                # Adjust page if needed
+                total_pages = max(1, (len(self.db_agents_cache) + self.DB_AGENTS_PER_PAGE - 1) // self.DB_AGENTS_PER_PAGE)
+                if self.db_page >= total_pages:
+                    self.db_page = max(0, total_pages - 1)
+        except Exception as e:
+            print(f"Error deleting agent from database: {e}")
 
     def _get_world_transform(self) -> tuple:
         """Get world-to-screen transform parameters.
