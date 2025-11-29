@@ -66,6 +66,9 @@ class CockpitApp:
         self.time_scale_min = 0.25
         self.time_scale_max = 4.0
 
+        # Camera tracking
+        self.tracking_agent_id: Optional[str] = None
+
         # Left panel tab state
         self.left_panel_tab = "world"  # world, agents, learn, rewards, predators, presets
 
@@ -392,6 +395,46 @@ class CockpitApp:
                     self.sort_dropdown_open = False
                     self.filter_dropdown_open = False
 
+                # Agent action buttons
+                if hasattr(self, 'track_btn_rect') and self.track_btn_rect.collidepoint(mouse_pos):
+                    wrapper = self._get_target_agent_wrapper()
+                    if wrapper:
+                        if self.tracking_agent_id == wrapper.agent_id:
+                            self.tracking_agent_id = None
+                            print("Stopped tracking")
+                        else:
+                            self.tracking_agent_id = wrapper.agent_id
+                            print(f"Tracking agent {wrapper.agent_id}")
+                    return
+
+                if hasattr(self, 'heal_btn_rect') and self.heal_btn_rect.collidepoint(mouse_pos):
+                    wrapper = self._get_target_agent_wrapper()
+                    if wrapper and wrapper.agent.is_alive:
+                        wrapper.agent.energy = wrapper.agent.genome.max_energy
+                        wrapper.agent.health = wrapper.agent.genome.max_health
+                        print(f"Healed agent {wrapper.agent_id}")
+                    return
+
+                if hasattr(self, 'respawn_btn_rect') and self.respawn_btn_rect.collidepoint(mouse_pos):
+                    wrapper = self._get_target_agent_wrapper()
+                    if wrapper and not wrapper.agent.is_alive:
+                        wrapper.agent.respawn()
+                        self.simulation.world.add_entity(wrapper.agent)
+                        print(f"Respawned agent {wrapper.agent_id}")
+                    return
+
+                if hasattr(self, 'save_agent_btn_rect') and self.save_agent_btn_rect.collidepoint(mouse_pos):
+                    self._save_selected_agent()
+                    return
+
+                if hasattr(self, 'edit_genome_btn_rect') and self.edit_genome_btn_rect.collidepoint(mouse_pos):
+                    self._open_genome_editor()
+                    return
+
+                if hasattr(self, 'load_db_btn_rect') and self.load_db_btn_rect.collidepoint(mouse_pos):
+                    self._open_database_browser()
+                    return
+
                 # Agent table row clicks - check FIRST to prevent race condition with world click
                 if self.right_panel_visible and hasattr(self, 'agent_table_rows'):
                     for row_rect, agent_id in self.agent_table_rows:
@@ -505,6 +548,22 @@ class CockpitApp:
             scale = min(scale_x, scale_y)
             offset_x = world_rect.left + (world_rect.width - self.simulation.world.width * scale) / 2
             offset_y = world_rect.top + (world_rect.height - self.simulation.world.height * scale) / 2
+
+        # Camera tracking - center on tracked agent
+        if self.tracking_agent_id and self.tracking_agent_id in self.simulation.agents:
+            wrapper = self.simulation.agents[self.tracking_agent_id]
+            if wrapper.agent.is_alive:
+                # Offset calculation to center on agent
+                agent_screen_x = offset_x + wrapper.agent.position.x * scale
+                agent_screen_y = offset_y + wrapper.agent.position.y * scale
+                center_x = world_rect.centerx
+                center_y = world_rect.centery
+                # Adjust offset to center on agent
+                offset_x += center_x - agent_screen_x
+                offset_y += center_y - agent_screen_y
+            else:
+                # Stop tracking dead agents
+                self.tracking_agent_id = None
 
         # Draw background
         pygame.draw.rect(self.screen, self.BG_DARKEST, world_rect)
@@ -1367,6 +1426,69 @@ class CockpitApp:
 
             y += 14
 
+        y += 8
+
+        # ACTIONS section header
+        pygame.draw.rect(self.screen, self.BG_DARK, pygame.Rect(x - 8, y, self.PANEL_WIDTH, 24))
+        actions_title = self.font_small.render("ACTIONS", True, self.TEXT_DIM)
+        self.screen.blit(actions_title, (x, y + 4))
+        y += 28
+
+        # Button row 1: Track, Edit Genome
+        btn_width = (width - 8) // 2
+        track_rect = pygame.Rect(x, y, btn_width, 26)
+        is_tracking = self.tracking_agent_id == wrapper.agent_id if wrapper else False
+        track_bg = self.CYAN_DIM if is_tracking else (37, 37, 48)
+        pygame.draw.rect(self.screen, track_bg, track_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, track_rect, 1, border_radius=4)
+        track_text = self.font_small.render("Eye Track" if not is_tracking else "Eye Stop", True,
+                                             self.BG_DARKEST if is_tracking else self.TEXT_NORMAL)
+        self.screen.blit(track_text, (x + 8, y + 5))
+        self.track_btn_rect = track_rect
+
+        edit_rect = pygame.Rect(x + btn_width + 8, y, btn_width, 26)
+        pygame.draw.rect(self.screen, (37, 37, 48), edit_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, edit_rect, 1, border_radius=4)
+        edit_text = self.font_small.render("Edit", True, self.TEXT_NORMAL)
+        self.screen.blit(edit_text, (x + btn_width + 16, y + 5))
+        self.edit_genome_btn_rect = edit_rect
+
+        y += 30
+
+        # Button row 2: Heal, Respawn
+        heal_rect = pygame.Rect(x, y, btn_width, 26)
+        pygame.draw.rect(self.screen, (0, 100, 60), heal_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.GREEN, heal_rect, 1, border_radius=4)
+        heal_text = self.font_small.render("Heal", True, self.TEXT_BRIGHT)
+        self.screen.blit(heal_text, (x + 8, y + 5))
+        self.heal_btn_rect = heal_rect
+
+        respawn_rect = pygame.Rect(x + btn_width + 8, y, btn_width, 26)
+        can_respawn = wrapper and not wrapper.agent.is_alive if wrapper else False
+        respawn_bg = (100, 60, 0) if can_respawn else (40, 40, 40)
+        pygame.draw.rect(self.screen, respawn_bg, respawn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, respawn_rect, 1, border_radius=4)
+        respawn_text = self.font_small.render("Resp", True, self.TEXT_NORMAL if can_respawn else self.TEXT_DIM)
+        self.screen.blit(respawn_text, (x + btn_width + 16, y + 5))
+        self.respawn_btn_rect = respawn_rect
+
+        y += 30
+
+        # Button row 3: Save, Load DB
+        save_rect = pygame.Rect(x, y, btn_width, 26)
+        pygame.draw.rect(self.screen, (37, 37, 48), save_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, save_rect, 1, border_radius=4)
+        save_text = self.font_small.render("Save", True, self.TEXT_NORMAL)
+        self.screen.blit(save_text, (x + 8, y + 5))
+        self.save_agent_btn_rect = save_rect
+
+        load_db_rect = pygame.Rect(x + btn_width + 8, y, btn_width, 26)
+        pygame.draw.rect(self.screen, (37, 37, 48), load_db_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, load_db_rect, 1, border_radius=4)
+        load_text = self.font_small.render("Load DB", True, self.TEXT_NORMAL)
+        self.screen.blit(load_text, (x + btn_width + 16, y + 5))
+        self.load_db_btn_rect = load_db_rect
+
     def _render(self) -> None:
         """Render full frame."""
         self.screen.fill(self.BG_DARKEST)
@@ -1562,6 +1684,14 @@ class CockpitApp:
         if self.agent_db.load_agent_into_wrapper(record.id, dead_wrapper):
             self.simulation.world.add_entity(dead_wrapper.agent)
             print(f"Loaded: {record.name} into {dead_wrapper.agent_id}")
+
+    def _open_genome_editor(self) -> None:
+        """Open genome editor modal (placeholder for future implementation)."""
+        print("Genome editor not yet implemented (Phase 6)")
+
+    def _open_database_browser(self) -> None:
+        """Open database browser modal (placeholder for future implementation)."""
+        print("Database browser not yet implemented (Phase 6)")
 
     def _get_world_transform(self) -> tuple:
         """Get world-to-screen transform parameters.
