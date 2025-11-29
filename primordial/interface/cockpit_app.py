@@ -182,6 +182,9 @@ class CockpitApp:
         self.sort_dropdown_open = False
         self.filter_dropdown_open = False
 
+        # Control mode
+        self.control_mode = False
+
         # Modal state
         self.help_modal_open = False
         self.genome_editor_open = False
@@ -288,6 +291,16 @@ class CockpitApp:
                 elif event.key == pygame.K_h:
                     # Toggle help modal
                     self.help_modal_open = not self.help_modal_open
+                elif event.key == pygame.K_c:
+                    # Toggle control mode (requires selected agent)
+                    if self.selected_agent_id:
+                        self.control_mode = not self.control_mode
+                        if self.control_mode:
+                            print("Control mode ON - use arrow keys to move agent")
+                        else:
+                            print("Control mode OFF")
+                    else:
+                        print("Select an agent first (click on one)")
                 elif pygame.K_1 <= event.key <= pygame.K_9:
                     index = event.key - pygame.K_1
                     self._load_agent_by_index(index)
@@ -598,6 +611,48 @@ class CockpitApp:
 
     def _update(self, dt: float) -> None:
         """Update simulation and UI."""
+        # Control mode - arrow keys move selected agent
+        if self.control_mode and not self.paused:
+            wrapper = self._get_target_agent_wrapper()
+            if wrapper and wrapper.agent.is_alive:
+                keys = pygame.key.get_pressed()
+                thrust = 0.0
+                torque = 0.0
+
+                if keys[pygame.K_UP]:
+                    thrust = 1.0
+                if keys[pygame.K_DOWN]:
+                    thrust = -0.5
+                if keys[pygame.K_LEFT]:
+                    torque = -1.0
+                if keys[pygame.K_RIGHT]:
+                    torque = 1.0
+
+                # Apply forces directly
+                if thrust != 0 or torque != 0:
+                    agent = wrapper.agent
+                    # Ensure agent has required attributes
+                    thrust_force = getattr(agent.genome, 'thrust_force', 500.0)
+                    torque_force = getattr(agent.genome, 'torque_force', 1000.0)
+                    mass = getattr(agent.genome, 'mass', 1.0)
+                    max_speed = getattr(agent.genome, 'max_speed', 200.0)
+
+                    # Thrust in facing direction
+                    fx = math.cos(agent.angle) * thrust * thrust_force * dt
+                    fy = math.sin(agent.angle) * thrust * thrust_force * dt
+                    agent.velocity.x += fx / mass
+                    agent.velocity.y += fy / mass
+
+                    # Clamp velocity to max speed
+                    speed = math.sqrt(agent.velocity.x**2 + agent.velocity.y**2)
+                    if speed > max_speed:
+                        scale = max_speed / speed
+                        agent.velocity.x *= scale
+                        agent.velocity.y *= scale
+
+                    # Torque
+                    agent.angular_velocity += torque * torque_force * dt / 100
+
         if not self.paused:
             scaled_dt = dt * self.time_scale
             self.simulation.tick(scaled_dt)
@@ -810,6 +865,15 @@ class CockpitApp:
         total = len(self.simulation.agents)
         pop_text = self.font_small.render(f"Pop: {alive}/{total}", True, self.TEXT_NORMAL)
         self.screen.blit(pop_text, (x, 14))
+        x += pop_text.get_width()
+
+        # Control mode indicator
+        if self.control_mode:
+            x += 20
+            pygame.draw.line(self.screen, (40, 40, 50), (x, 8), (x, self.TOPBAR_HEIGHT - 8))
+            x += 10
+            ctrl_text = self.font_small.render("CTRL", True, (255, 100, 100))
+            self.screen.blit(ctrl_text, (x, 14))
 
     def _render_bottombar(self) -> None:
         """Render HUD bottom bar."""
