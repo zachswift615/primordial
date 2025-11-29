@@ -159,6 +159,17 @@ class CockpitApp:
             "social_bonus": SurvivalRewards.SOCIAL_BONUS,
         }
 
+        # Predator config (default values for new predators)
+        self.predator_config = {
+            "patrol_radius": 150.0,
+            "detection_radius": 250.0,
+            "chase_speed": 120.0,
+            "patrol_speed": 40.0,
+            "damage": 20.0,
+            "attack_cooldown": 1.0,
+            "chase_abandon_distance": 350.0,
+        }
+
         # Active slider being dragged
         self.active_slider = None
 
@@ -305,6 +316,20 @@ class CockpitApp:
                             self.active_slider = key
                             break
 
+                # Predators tab sliders
+                if self.left_panel_visible and self.left_panel_tab == "predators":
+                    pred_keys = ["pred_patrol_radius", "pred_patrol_speed", "pred_detection_radius",
+                                 "pred_chase_speed", "pred_chase_abandon", "pred_damage", "pred_attack_cooldown"]
+                    for key in pred_keys:
+                        rect = getattr(self, f"slider_{key}_rect", None)
+                        if rect and rect.collidepoint(mouse_pos):
+                            self.active_slider = key
+                            break
+
+                    # Apply to all predators button
+                    if hasattr(self, 'apply_pred_btn_rect') and self.apply_pred_btn_rect.collidepoint(mouse_pos):
+                        self._apply_predator_config()
+
                 # Agent table row clicks - check FIRST to prevent race condition with world click
                 if self.right_panel_visible and hasattr(self, 'agent_table_rows'):
                     for row_rect, agent_id in self.agent_table_rows:
@@ -358,6 +383,19 @@ class CockpitApp:
                         }
                         if reward_key in attr_map:
                             setattr(SurvivalRewards, attr_map[reward_key], new_val)
+                    # Handle predator sliders
+                    elif self.active_slider.startswith("pred_"):
+                        config_map = {
+                            "pred_patrol_radius": "patrol_radius",
+                            "pred_patrol_speed": "patrol_speed",
+                            "pred_detection_radius": "detection_radius",
+                            "pred_chase_speed": "chase_speed",
+                            "pred_chase_abandon": "chase_abandon_distance",
+                            "pred_damage": "damage",
+                            "pred_attack_cooldown": "attack_cooldown",
+                        }
+                        if self.active_slider in config_map:
+                            self.predator_config[config_map[self.active_slider]] = new_val
                     # Handle control value sliders
                     elif self.active_slider in self.control_values:
                         # Round integers
@@ -904,6 +942,53 @@ class CockpitApp:
             y += self._render_slider(x, y, width, "Social Bonus",
                                      self.reward_values["social_bonus"], 0.0, 0.1, "reward_social_bonus", 0.01)
 
+        elif self.left_panel_tab == "predators":
+            # PATROL section
+            section = self.font_small.render("PATROL", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Patrol Radius",
+                                     self.predator_config["patrol_radius"], 50, 300, "pred_patrol_radius", 150.0)
+            y += self._render_slider(x, y, width, "Patrol Speed",
+                                     self.predator_config["patrol_speed"], 20, 80, "pred_patrol_speed", 40.0)
+            y += 8
+
+            # DETECTION section
+            section = self.font_small.render("DETECTION", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Detection Radius",
+                                     self.predator_config["detection_radius"], 100, 400, "pred_detection_radius", 250.0)
+            y += self._render_slider(x, y, width, "Chase Speed",
+                                     self.predator_config["chase_speed"], 60, 200, "pred_chase_speed", 120.0)
+            y += self._render_slider(x, y, width, "Abandon Distance",
+                                     self.predator_config["chase_abandon_distance"], 200, 500, "pred_chase_abandon", 350.0)
+            y += 8
+
+            # COMBAT section
+            section = self.font_small.render("COMBAT", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Damage",
+                                     self.predator_config["damage"], 5, 50, "pred_damage", 20.0)
+            y += self._render_slider(x, y, width, "Attack Cooldown",
+                                     self.predator_config["attack_cooldown"], 0.5, 3.0, "pred_attack_cooldown", 1.0)
+
+            # Apply to existing button
+            y += 16
+            apply_rect = pygame.Rect(x, y, width, 28)
+            pygame.draw.rect(self.screen, (37, 37, 48), apply_rect, border_radius=4)
+            pygame.draw.rect(self.screen, self.CYAN_DIM, apply_rect, 1, border_radius=4)
+            apply_text = self.font_small.render("Apply to All Predators", True, self.CYAN)
+            self.screen.blit(apply_text, (apply_rect.centerx - apply_text.get_width() // 2, y + 6))
+            self.apply_pred_btn_rect = apply_rect
+
         else:
             # Placeholder for other tabs
             content_text = self.font_small.render(f"[{self.left_panel_tab.upper()} controls]", True, self.TEXT_DIM)
@@ -1133,6 +1218,21 @@ class CockpitApp:
         if wrapper:
             wrapper.events.append('human_punish')
             print(f"Punish sent to {wrapper.agent_id}")
+
+    def _apply_predator_config(self) -> None:
+        """Apply current predator config to all active predators."""
+        count = 0
+        for predator in self.simulation.world.predators:
+            if predator.is_active:
+                predator.patrol_radius = self.predator_config["patrol_radius"]
+                predator.detection_radius = self.predator_config["detection_radius"]
+                predator.chase_speed = self.predator_config["chase_speed"]
+                predator.patrol_speed = self.predator_config["patrol_speed"]
+                predator.damage = self.predator_config["damage"]
+                predator.attack_cooldown_max = self.predator_config["attack_cooldown"]
+                predator.chase_abandon_distance = self.predator_config["chase_abandon_distance"]
+                count += 1
+        print(f"Applied predator config to {count} predators")
 
     def _get_target_agent_wrapper(self):
         """Get wrapper for selected agent or first living agent."""
