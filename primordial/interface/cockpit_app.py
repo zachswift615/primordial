@@ -170,7 +170,17 @@ class CockpitApp:
             "chase_abandon_distance": 350.0,
         }
 
-        # Presets
+        # Active slider being dragged
+        self.active_slider = None
+
+        # User data directory for saves (must be before presets)
+        self.user_data_dir = Path.home() / ".primordial"
+        self.user_data_dir.mkdir(exist_ok=True)
+        self.maps_dir = self.user_data_dir / "maps"
+        self.maps_dir.mkdir(exist_ok=True)
+        self.presets_file = self.user_data_dir / "custom_presets.json"
+
+        # Presets (after user_data_dir setup)
         self.presets = {
             "Easy": {"max_agents": 3, "predator_count": 1, "initial_food": 80},
             "Normal": {"max_agents": 5, "predator_count": 2, "initial_food": 50},
@@ -179,16 +189,6 @@ class CockpitApp:
         }
         self.current_preset = "Normal"
         self._load_custom_presets()
-
-        # Active slider being dragged
-        self.active_slider = None
-
-        # User data directory for saves
-        self.user_data_dir = Path.home() / ".primordial"
-        self.user_data_dir.mkdir(exist_ok=True)
-        self.maps_dir = self.user_data_dir / "maps"
-        self.maps_dir.mkdir(exist_ok=True)
-        self.presets_file = self.user_data_dir / "custom_presets.json"
 
         # Build UI
         self._build_ui()
