@@ -59,6 +59,9 @@ class CockpitApp:
         self.selected_agent_id: Optional[str] = None
         self.time_scale = 1.0
 
+        # Left panel tab state
+        self.left_panel_tab = "world"  # world, agents, learn, rewards, predators, presets
+
         # Initialize pygame
         pygame.init()
         self.screen = pygame.display.set_mode((window_width, window_height), pygame.RESIZABLE)
@@ -148,6 +151,22 @@ class CockpitApp:
                     self._send_punish()
                 elif self.pause_btn_rect.collidepoint(mouse_pos):
                     self.paused = not self.paused
+
+                # Left panel tab clicks
+                if self.left_panel_visible:
+                    tabs = ["world", "agents", "learn", "rewards", "predators", "presets"]
+                    tab_y = self.TOPBAR_HEIGHT + 44
+                    tab_x = 8
+                    for key in tabs:
+                        tab_width = 42 if key == "predators" else 46
+                        tab_rect = pygame.Rect(tab_x, tab_y, tab_width, 24)
+                        if tab_rect.collidepoint(mouse_pos):
+                            self.left_panel_tab = key
+                            break
+                        tab_x += tab_width + 4
+                        if tab_x > self.PANEL_WIDTH - 50:
+                            tab_x = 8
+                            tab_y += 28
 
             # Pass to pygame-gui
             self.ui_manager.process_events(event)
@@ -418,6 +437,77 @@ class CockpitApp:
         help_text = self.font_small.render("?", True, self.TEXT_NORMAL)
         self.screen.blit(help_text, (x + 20, bar_top + 14))
 
+    def _render_left_panel(self) -> None:
+        """Render left control panel."""
+        if not self.left_panel_visible:
+            # Draw collapse button only
+            btn_rect = pygame.Rect(8, self.TOPBAR_HEIGHT + 8, 24, 24)
+            pygame.draw.rect(self.screen, self.BG_PANEL, btn_rect, border_radius=4)
+            pygame.draw.rect(self.screen, self.CYAN_DIM, btn_rect, 1, border_radius=4)
+            arrow = self.font_small.render(">", True, self.CYAN)
+            self.screen.blit(arrow, (btn_rect.x + 8, btn_rect.y + 4))
+            return
+
+        panel_height = self.window_height - self.TOPBAR_HEIGHT - self.BOTTOMBAR_HEIGHT
+        panel_rect = pygame.Rect(0, self.TOPBAR_HEIGHT, self.PANEL_WIDTH, panel_height)
+
+        # Panel background
+        pygame.draw.rect(self.screen, self.BG_PANEL, panel_rect)
+        pygame.draw.line(self.screen, self.CYAN_DIM,
+                        (self.PANEL_WIDTH - 1, self.TOPBAR_HEIGHT),
+                        (self.PANEL_WIDTH - 1, self.window_height - self.BOTTOMBAR_HEIGHT))
+
+        # Header
+        header_rect = pygame.Rect(0, self.TOPBAR_HEIGHT, self.PANEL_WIDTH, 36)
+        pygame.draw.rect(self.screen, self.BG_DARK, header_rect)
+        pygame.draw.line(self.screen, self.CYAN_DIM, (0, header_rect.bottom), (self.PANEL_WIDTH, header_rect.bottom))
+
+        title = self.font_small.render("CONTROLS", True, self.CYAN)
+        self.screen.blit(title, (12, self.TOPBAR_HEIGHT + 10))
+
+        # Collapse button
+        btn_rect = pygame.Rect(self.PANEL_WIDTH - 32, self.TOPBAR_HEIGHT + 6, 24, 24)
+        pygame.draw.rect(self.screen, (37, 37, 48), btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, btn_rect, 1, border_radius=4)
+        arrow = self.font_small.render("<", True, self.TEXT_DIM)
+        self.screen.blit(arrow, (btn_rect.x + 8, btn_rect.y + 4))
+
+        # Tabs
+        tabs = ["World", "Agents", "Learn", "Rewards", "Pred", "Presets"]
+        tab_keys = ["world", "agents", "learn", "rewards", "predators", "presets"]
+        tab_y = self.TOPBAR_HEIGHT + 44
+        tab_x = 8
+
+        for i, (label, key) in enumerate(zip(tabs, tab_keys)):
+            tab_width = 42 if label in ["Pred"] else 46
+            tab_rect = pygame.Rect(tab_x, tab_y, tab_width, 24)
+
+            is_active = self.left_panel_tab == key
+            bg_color = (42, 42, 56) if is_active else (37, 37, 48)
+            border_color = self.CYAN if is_active else (37, 37, 48)
+            text_color = self.CYAN if is_active else self.TEXT_DIM
+
+            pygame.draw.rect(self.screen, bg_color, tab_rect, border_radius=4)
+            pygame.draw.rect(self.screen, border_color, tab_rect, 1, border_radius=4)
+
+            tab_text = self.font_small.render(label, True, text_color)
+            self.screen.blit(tab_text, (tab_x + 4, tab_y + 5))
+
+            tab_x += tab_width + 4
+            if tab_x > self.PANEL_WIDTH - 50:
+                tab_x = 8
+                tab_y += 28
+
+        # Content area
+        content_top = tab_y + 32
+        self._render_left_panel_content(content_top)
+
+    def _render_left_panel_content(self, top: int) -> None:
+        """Render content for current tab."""
+        # Placeholder - will be implemented per tab
+        content_text = self.font_small.render(f"[{self.left_panel_tab.upper()} controls]", True, self.TEXT_DIM)
+        self.screen.blit(content_text, (16, top + 16))
+
     def _render(self) -> None:
         """Render full frame."""
         self.screen.fill(self.BG_DARKEST)
@@ -428,6 +518,9 @@ class CockpitApp:
         # Render HUD bars
         self._render_topbar()
         self._render_bottombar()
+
+        # Render side panels
+        self._render_left_panel()
 
         # Render pygame-gui
         self.ui_manager.draw_ui(self.screen)
