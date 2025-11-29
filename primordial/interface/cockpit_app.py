@@ -1,15 +1,19 @@
 """Cockpit-style teaching interface with comprehensive controls."""
 
+import json
 import math
 import pygame
 import pygame_gui
 from pathlib import Path
+from datetime import datetime
 from typing import Optional, Dict, Any, List
 
 from primordial.simulation.simulation import Simulation
 from primordial.simulation.config import SimulationConfig
 from primordial.simulation.agent_database import AgentDatabase
 from primordial.interface.audio_capture import AudioCapture
+from primordial.agents.genome import AgentGenome
+from primordial.learning.rewards import SurvivalRewards
 
 
 class CockpitApp:
@@ -136,6 +140,13 @@ class CockpitApp:
 
         # Active slider being dragged
         self.active_slider = None
+
+        # User data directory for saves
+        self.user_data_dir = Path.home() / ".primordial"
+        self.user_data_dir.mkdir(exist_ok=True)
+        self.maps_dir = self.user_data_dir / "maps"
+        self.maps_dir.mkdir(exist_ok=True)
+        self.presets_file = self.user_data_dir / "custom_presets.json"
 
         # Build UI
         self._build_ui()
