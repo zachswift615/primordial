@@ -109,6 +109,18 @@ class CockpitApp:
         # Pause state
         self.paused = False
 
+        # Control values (live-edit the sim_config)
+        self.control_values = {
+            "max_agents": self.sim_config.max_agents,
+            "initial_food": self.sim_config.initial_food,
+            "max_food": self.sim_config.max_food,
+            "predator_count": self.sim_config.predator_count,
+            "tick_rate": self.sim_config.tick_rate,
+        }
+
+        # Active slider being dragged
+        self.active_slider = None
+
         # Build UI
         self._build_ui()
 
@@ -167,6 +179,34 @@ class CockpitApp:
                         if tab_x > self.PANEL_WIDTH - 50:
                             tab_x = 8
                             tab_y += 28
+
+                # Slider interaction
+                if self.left_panel_visible and self.left_panel_tab == "world":
+                    for key in ["max_agents", "initial_food", "max_food", "predator_count", "tick_rate"]:
+                        rect = getattr(self, f"slider_{key}_rect", None)
+                        if rect and rect.collidepoint(mouse_pos):
+                            self.active_slider = key
+                            break
+
+            if event.type == pygame.MOUSEBUTTONUP:
+                self.active_slider = None
+
+            if event.type == pygame.MOUSEMOTION and self.active_slider:
+                rect = getattr(self, f"slider_{self.active_slider}_rect", None)
+                min_val, max_val = getattr(self, f"slider_{self.active_slider}_range", (0, 100))
+                if rect:
+                    rel_x = max(0, min(event.pos[0] - rect.x, rect.width))
+                    pct = rel_x / rect.width
+                    new_val = min_val + pct * (max_val - min_val)
+                    # Round integers
+                    if self.active_slider in ["max_agents", "initial_food", "max_food", "predator_count", "tick_rate"]:
+                        new_val = int(round(new_val))
+                    self.control_values[self.active_slider] = new_val
+                    # Apply to config (live update) with validation
+                    if hasattr(self.sim_config, self.active_slider):
+                        setattr(self.sim_config, self.active_slider, new_val)
+                    else:
+                        print(f"Warning: sim_config has no attribute '{self.active_slider}'")
 
             # Pass to pygame-gui
             self.ui_manager.process_events(event)
@@ -502,11 +542,85 @@ class CockpitApp:
         content_top = tab_y + 32
         self._render_left_panel_content(content_top)
 
+    def _render_slider(self, x: int, y: int, width: int, label: str, value: float,
+                       min_val: float, max_val: float, key: str, default: float) -> int:
+        """Render a slider control. Returns height used."""
+        # Label row
+        label_text = self.font_small.render(label, True, self.TEXT_NORMAL)
+        self.screen.blit(label_text, (x, y))
+
+        default_text = self.font_small.render(f"Default: {default}", True, self.TEXT_DIM)
+        self.screen.blit(default_text, (x + width - default_text.get_width(), y))
+
+        y += 18
+
+        # Slider track
+        track_rect = pygame.Rect(x, y + 4, width - 70, 6)
+        pygame.draw.rect(self.screen, (37, 37, 48), track_rect, border_radius=3)
+
+        # Slider fill
+        pct = (value - min_val) / (max_val - min_val) if max_val > min_val else 0
+        fill_width = int(track_rect.width * pct)
+        fill_rect = pygame.Rect(x, y + 4, fill_width, 6)
+        pygame.draw.rect(self.screen, self.CYAN_DIM, fill_rect, border_radius=3)
+
+        # Slider thumb
+        thumb_x = x + fill_width
+        thumb_rect = pygame.Rect(thumb_x - 6, y, 12, 14)
+        pygame.draw.rect(self.screen, self.CYAN, thumb_rect, border_radius=6)
+
+        # Store rect for interaction
+        setattr(self, f"slider_{key}_rect", pygame.Rect(x, y, width - 70, 14))
+        setattr(self, f"slider_{key}_range", (min_val, max_val))
+
+        # Value input
+        input_rect = pygame.Rect(x + width - 55, y - 2, 50, 18)
+        pygame.draw.rect(self.screen, (37, 37, 48), input_rect, border_radius=4)
+        pygame.draw.rect(self.screen, (42, 42, 56), input_rect, 1, border_radius=4)
+
+        val_str = str(int(value)) if value == int(value) else f"{value:.1f}"
+        val_text = self.font_small.render(val_str, True, self.TEXT_BRIGHT)
+        self.screen.blit(val_text, (input_rect.right - val_text.get_width() - 4, y))
+
+        return 38  # Height used
+
     def _render_left_panel_content(self, top: int) -> None:
         """Render content for current tab."""
-        # Placeholder - will be implemented per tab
-        content_text = self.font_small.render(f"[{self.left_panel_tab.upper()} controls]", True, self.TEXT_DIM)
-        self.screen.blit(content_text, (16, top + 16))
+        x = 12
+        y = top
+        width = self.PANEL_WIDTH - 24
+
+        if self.left_panel_tab == "world":
+            # Population section
+            section = self.font_small.render("POPULATION", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Max Agents",
+                                     self.control_values["max_agents"], 1, 20, "max_agents", 5)
+            y += self._render_slider(x, y, width, "Initial Food",
+                                     self.control_values["initial_food"], 10, 200, "initial_food", 50)
+            y += self._render_slider(x, y, width, "Max Food",
+                                     self.control_values["max_food"], 20, 500, "max_food", 100)
+            y += self._render_slider(x, y, width, "Predator Count",
+                                     self.control_values["predator_count"], 0, 10, "predator_count", 2)
+
+            y += 8
+
+            # Environment section
+            section = self.font_small.render("ENVIRONMENT", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Tick Rate",
+                                     self.control_values["tick_rate"], 15, 120, "tick_rate", 60)
+
+        else:
+            # Placeholder for other tabs
+            content_text = self.font_small.render(f"[{self.left_panel_tab.upper()} controls]", True, self.TEXT_DIM)
+            self.screen.blit(content_text, (x, y + 16))
 
     def _render(self) -> None:
         """Render full frame."""
