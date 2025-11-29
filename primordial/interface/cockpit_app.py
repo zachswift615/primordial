@@ -179,6 +179,17 @@ class CockpitApp:
                 elif event.key == pygame.K_BACKSLASH:  # \ = reset
                     self.time_scale = 1.0
                     print(f"Time scale: {self.time_scale:.2f}x (reset)")
+                # Save/Load shortcuts
+                elif event.key == pygame.K_s:
+                    if mods & pygame.KMOD_SHIFT:
+                        self._save_all_agents()
+                    else:
+                        self._save_selected_agent()
+                elif event.key == pygame.K_l:
+                    self._list_saved_agents()
+                elif pygame.K_1 <= event.key <= pygame.K_9:
+                    index = event.key - pygame.K_1
+                    self._load_agent_by_index(index)
 
             # Mouse clicks
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -899,6 +910,68 @@ class CockpitApp:
             if wrapper.agent.is_alive:
                 return wrapper
         return None
+
+    def _save_selected_agent(self) -> None:
+        """Save selected agent to database."""
+        wrapper = self._get_target_agent_wrapper()
+        if wrapper is None:
+            print("No agent selected to save")
+            return
+
+        agent_id = self.agent_db.save_agent(wrapper)
+        stats = wrapper.lifetime_stats
+        print(f"\n=== Agent Saved ===")
+        print(f"  DB ID: {agent_id}")
+        print(f"  Name: {wrapper.agent_id}_gen{wrapper.generation}")
+        print(f"  Generation: {wrapper.generation}")
+        print(f"  Food eaten: {stats.get('total_food_eaten', 0)}")
+        print(f"===================\n")
+
+    def _save_all_agents(self) -> None:
+        """Save all living agents to database."""
+        saved = 0
+        for wrapper in self.simulation.agents.values():
+            if wrapper.agent.is_alive:
+                self.agent_db.save_agent(wrapper)
+                saved += 1
+        print(f"\n=== Saved {saved} agents ===\n")
+
+    def _list_saved_agents(self) -> None:
+        """List agents in database."""
+        agents = self.agent_db.list_agents(order_by='longest_life', limit=9)
+        dead_slots = sum(1 for w in self.simulation.agents.values() if not w.agent.is_alive)
+
+        print(f"\n{'='*50}")
+        print(f"  SAVED AGENTS")
+        print(f"{'='*50}")
+        for i, a in enumerate(agents):
+            print(f"  [{i+1}] {a.name[:20]:<20} Gen:{a.generation:>3}  Life:{a.longest_life:>6.1f}s")
+        print(f"{'='*50}")
+        print(f"  Press 1-9 to load. Dead slots: {dead_slots}")
+        print(f"{'='*50}\n")
+
+    def _load_agent_by_index(self, index: int) -> None:
+        """Load agent from database into dead slot."""
+        # Find dead slot
+        dead_wrapper = None
+        for w in self.simulation.agents.values():
+            if not w.agent.is_alive:
+                dead_wrapper = w
+                break
+
+        if dead_wrapper is None:
+            print("No dead slots available")
+            return
+
+        agents = self.agent_db.list_agents(order_by='longest_life', limit=9)
+        if index >= len(agents):
+            print(f"No agent at position {index + 1}")
+            return
+
+        record = agents[index]
+        if self.agent_db.load_agent_into_wrapper(record.id, dead_wrapper):
+            self.simulation.world.add_entity(dead_wrapper.agent)
+            print(f"Loaded: {record.name} into {dead_wrapper.agent_id}")
 
     def _get_world_transform(self) -> tuple:
         """Get world-to-screen transform parameters.
