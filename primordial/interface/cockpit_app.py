@@ -146,6 +146,19 @@ class CockpitApp:
         # Default genome for new agents (modifiable via Agents tab)
         self.default_genome = AgentGenome()
 
+        # Reward values (modifiable - affects SurvivalRewards class)
+        self.reward_values = {
+            "eating_food": SurvivalRewards.EATING_FOOD,
+            "taking_damage": SurvivalRewards.TAKING_DAMAGE,
+            "death": SurvivalRewards.DEATH,
+            "starving": SurvivalRewards.STARVING,
+            "low_health": SurvivalRewards.LOW_HEALTH,
+            "healthy": SurvivalRewards.HEALTHY,
+            "movement_bonus": SurvivalRewards.MOVEMENT_BONUS,
+            "idle_penalty": SurvivalRewards.IDLE_PENALTY,
+            "social_bonus": SurvivalRewards.SOCIAL_BONUS,
+        }
+
         # Active slider being dragged
         self.active_slider = None
 
@@ -281,6 +294,17 @@ class CockpitApp:
                             self.active_slider = key
                             break
 
+                # Rewards tab sliders
+                if self.left_panel_visible and self.left_panel_tab == "rewards":
+                    reward_keys = ["reward_eating_food", "reward_taking_damage", "reward_death",
+                                   "reward_starving", "reward_low_health", "reward_healthy",
+                                   "reward_movement_bonus", "reward_idle_penalty", "reward_social_bonus"]
+                    for key in reward_keys:
+                        rect = getattr(self, f"slider_{key}_rect", None)
+                        if rect and rect.collidepoint(mouse_pos):
+                            self.active_slider = key
+                            break
+
                 # Agent table row clicks - check FIRST to prevent race condition with world click
                 if self.right_panel_visible and hasattr(self, 'agent_table_rows'):
                     for row_rect, agent_id in self.agent_table_rows:
@@ -321,6 +345,19 @@ class CockpitApp:
                         self.control_values[self.active_slider] = new_val
                         if hasattr(self.sim_config, self.active_slider):
                             setattr(self.sim_config, self.active_slider, new_val)
+                    # Handle reward sliders
+                    elif self.active_slider.startswith("reward_"):
+                        reward_key = self.active_slider.replace("reward_", "")
+                        self.reward_values[reward_key] = new_val
+                        # Update SurvivalRewards class attribute
+                        attr_map = {
+                            "eating_food": "EATING_FOOD", "taking_damage": "TAKING_DAMAGE",
+                            "death": "DEATH", "starving": "STARVING", "low_health": "LOW_HEALTH",
+                            "healthy": "HEALTHY", "movement_bonus": "MOVEMENT_BONUS",
+                            "idle_penalty": "IDLE_PENALTY", "social_bonus": "SOCIAL_BONUS"
+                        }
+                        if reward_key in attr_map:
+                            setattr(SurvivalRewards, attr_map[reward_key], new_val)
                     # Handle control value sliders
                     elif self.active_slider in self.control_values:
                         # Round integers
@@ -824,6 +861,48 @@ class CockpitApp:
             self.screen.blit(note, (x, y + 16))
             note2 = self.font_small.render("to new agents only", True, self.TEXT_DIM)
             self.screen.blit(note2, (x, y + 30))
+
+        elif self.left_panel_tab == "rewards":
+            # EVENT REWARDS section
+            section = self.font_small.render("EVENT REWARDS", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Eating Food",
+                                     self.reward_values["eating_food"], 0.0, 5.0, "reward_eating_food", 1.0)
+            y += self._render_slider(x, y, width, "Taking Damage",
+                                     self.reward_values["taking_damage"], -5.0, 0.0, "reward_taking_damage", -2.0)
+            y += self._render_slider(x, y, width, "Death",
+                                     self.reward_values["death"], -20.0, 0.0, "reward_death", -10.0)
+            y += 8
+
+            # CONTINUOUS REWARDS section
+            section = self.font_small.render("CONTINUOUS REWARDS", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Starving",
+                                     self.reward_values["starving"], -0.5, 0.0, "reward_starving", -0.1)
+            y += self._render_slider(x, y, width, "Low Health",
+                                     self.reward_values["low_health"], -0.2, 0.0, "reward_low_health", -0.05)
+            y += self._render_slider(x, y, width, "Healthy",
+                                     self.reward_values["healthy"], 0.0, 0.1, "reward_healthy", 0.01)
+            y += 8
+
+            # BEHAVIOR REWARDS section
+            section = self.font_small.render("BEHAVIOR REWARDS", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Movement Bonus",
+                                     self.reward_values["movement_bonus"], 0.0, 0.1, "reward_movement_bonus", 0.02)
+            y += self._render_slider(x, y, width, "Idle Penalty",
+                                     self.reward_values["idle_penalty"], -0.1, 0.0, "reward_idle_penalty", -0.01)
+            y += self._render_slider(x, y, width, "Social Bonus",
+                                     self.reward_values["social_bonus"], 0.0, 0.1, "reward_social_bonus", 0.01)
 
         else:
             # Placeholder for other tabs
