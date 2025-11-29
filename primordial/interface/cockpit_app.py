@@ -65,6 +65,11 @@ class CockpitApp:
         pygame.display.set_caption("Primordial - Cockpit Interface")
         self.clock = pygame.time.Clock()
 
+        # Fonts
+        self.font = pygame.font.Font(None, 24)
+        self.font_small = pygame.font.Font(None, 18)
+        self.font_large = pygame.font.Font(None, 32)
+
         # Initialize pygame-gui with error handling for theme loading
         theme_path = Path(__file__).parent / "theme.json"
         try:
@@ -234,7 +239,83 @@ class CockpitApp:
         pygame.draw.line(self.screen, self.CYAN_DIM, (0, self.TOPBAR_HEIGHT - 1),
                         (self.window_width, self.TOPBAR_HEIGHT - 1))
 
-        # TODO: Render FPS, speed controls, etc.
+        x = 16
+
+        # Logo
+        logo = self.font_large.render("PRIMORDIAL", True, self.CYAN)
+        self.screen.blit(logo, (x, 8))
+        x += logo.get_width() + 20
+
+        # Divider
+        pygame.draw.line(self.screen, (40, 40, 50), (x, 8), (x, self.TOPBAR_HEIGHT - 8))
+        x += 20
+
+        # FPS
+        fps = int(self.clock.get_fps())
+        fps_text = self.font_small.render(f"FPS: {fps}", True, self.TEXT_DIM)
+        self.screen.blit(fps_text, (x, 14))
+        x += fps_text.get_width() + 20
+
+        # Divider
+        pygame.draw.line(self.screen, (40, 40, 50), (x, 8), (x, self.TOPBAR_HEIGHT - 8))
+        x += 20
+
+        # Speed control
+        speed_label = self.font_small.render(f"{self.time_scale:.1f}x", True, self.CYAN)
+        # Slow button
+        slow_rect = pygame.Rect(x, 10, 24, 24)
+        pygame.draw.rect(self.screen, (37, 37, 48), slow_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.CYAN_DIM, slow_rect, 1, border_radius=4)
+        slow_text = self.font_small.render("<", True, self.CYAN)
+        self.screen.blit(slow_text, (x + 8, 12))
+        x += 28
+
+        # Speed value
+        self.screen.blit(speed_label, (x, 14))
+        x += speed_label.get_width() + 4
+
+        # Fast button
+        fast_rect = pygame.Rect(x, 10, 24, 24)
+        pygame.draw.rect(self.screen, (37, 37, 48), fast_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.CYAN_DIM, fast_rect, 1, border_radius=4)
+        fast_text = self.font_small.render(">", True, self.CYAN)
+        self.screen.blit(fast_text, (x + 8, 12))
+        x += 44
+
+        # Divider
+        pygame.draw.line(self.screen, (40, 40, 50), (x, 8), (x, self.TOPBAR_HEIGHT - 8))
+        x += 20
+
+        # Day/Night
+        env = self.simulation.world.environment
+        if hasattr(env, 'brightness'):
+            is_night = env.brightness < 0.3
+            icon = "N" if is_night else "D"
+            text = "Night" if is_night else "Day"
+            color = (170, 102, 255) if is_night else (255, 170, 0)
+            day_text = self.font_small.render(f"{icon} {text}", True, color)
+            self.screen.blit(day_text, (x, 14))
+            x += day_text.get_width() + 20
+
+        # Divider
+        pygame.draw.line(self.screen, (40, 40, 50), (x, 8), (x, self.TOPBAR_HEIGHT - 8))
+        x += 20
+
+        # Generation (highest)
+        max_gen = max((w.generation for w in self.simulation.agents.values()), default=0)
+        gen_text = self.font_small.render(f"Gen: {max_gen}", True, self.TEXT_NORMAL)
+        self.screen.blit(gen_text, (x, 14))
+        x += gen_text.get_width() + 20
+
+        # Divider
+        pygame.draw.line(self.screen, (40, 40, 50), (x, 8), (x, self.TOPBAR_HEIGHT - 8))
+        x += 20
+
+        # Population
+        alive = sum(1 for w in self.simulation.agents.values() if w.agent.is_alive)
+        total = len(self.simulation.agents)
+        pop_text = self.font_small.render(f"Pop: {alive}/{total}", True, self.TEXT_NORMAL)
+        self.screen.blit(pop_text, (x, 14))
 
     def _render_bottombar(self) -> None:
         """Render HUD bottom bar."""
