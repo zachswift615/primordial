@@ -182,6 +182,11 @@ class CockpitApp:
         self.sort_dropdown_open = False
         self.filter_dropdown_open = False
 
+        # Modal state
+        self.help_modal_open = False
+        self.genome_editor_open = False
+        self.database_browser_open = False
+
         # User data directory for saves (must be before presets)
         self.user_data_dir = Path.home() / ".primordial"
         self.user_data_dir.mkdir(exist_ok=True)
@@ -225,7 +230,11 @@ class CockpitApp:
                 mods = pygame.key.get_mods()
 
                 if event.key == pygame.K_ESCAPE:
-                    self.running = False
+                    # Close modal if open, otherwise quit
+                    if self.help_modal_open:
+                        self.help_modal_open = False
+                    else:
+                        self.running = False
                 elif event.key == pygame.K_TAB:
                     if mods & pygame.KMOD_SHIFT:
                         self.right_panel_visible = not self.right_panel_visible
@@ -263,6 +272,9 @@ class CockpitApp:
                         self._save_selected_agent()
                 elif event.key == pygame.K_l:
                     self._list_saved_agents()
+                elif event.key == pygame.K_h:
+                    # Toggle help modal
+                    self.help_modal_open = not self.help_modal_open
                 elif pygame.K_1 <= event.key <= pygame.K_9:
                     index = event.key - pygame.K_1
                     self._load_agent_by_index(index)
@@ -270,6 +282,12 @@ class CockpitApp:
             # Mouse clicks
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 mouse_pos = pygame.mouse.get_pos()
+
+                # Help modal close button
+                if self.help_modal_open and hasattr(self, 'help_modal_close_btn_rect'):
+                    if self.help_modal_close_btn_rect.collidepoint(mouse_pos):
+                        self.help_modal_open = False
+                        continue
 
                 # Teaching buttons
                 if self.reward_btn_rect.collidepoint(mouse_pos):
@@ -1495,6 +1513,127 @@ class CockpitApp:
         self.screen.blit(load_text, (x + btn_width + 16, y + 5))
         self.load_db_btn_rect = load_db_rect
 
+    def _render_help_modal(self) -> None:
+        """Render keyboard shortcuts help modal."""
+        if not self.help_modal_open:
+            return
+
+        # Semi-transparent dark overlay
+        overlay = pygame.Surface((self.window_width, self.window_height))
+        overlay.set_alpha(180)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+
+        # Modal panel dimensions
+        modal_width = 700
+        modal_height = 500
+        modal_x = (self.window_width - modal_width) // 2
+        modal_y = (self.window_height - modal_height) // 2
+
+        # Modal background
+        modal_rect = pygame.Rect(modal_x, modal_y, modal_width, modal_height)
+        pygame.draw.rect(self.screen, self.BG_DARK, modal_rect, border_radius=8)
+        pygame.draw.rect(self.screen, self.CYAN, modal_rect, 2, border_radius=8)
+
+        # Title
+        title = self.font_large.render("Keyboard Shortcuts", True, self.CYAN)
+        title_rect = title.get_rect(center=(self.window_width // 2, modal_y + 30))
+        self.screen.blit(title, title_rect)
+
+        # Close button (X in top-right)
+        close_btn_size = 28
+        close_btn_x = modal_x + modal_width - close_btn_size - 10
+        close_btn_y = modal_y + 10
+        self.help_modal_close_btn_rect = pygame.Rect(close_btn_x, close_btn_y, close_btn_size, close_btn_size)
+        pygame.draw.rect(self.screen, (60, 60, 70), self.help_modal_close_btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, self.help_modal_close_btn_rect, 1, border_radius=4)
+        close_text = self.font_small.render("X", True, self.TEXT_BRIGHT)
+        self.screen.blit(close_text, (close_btn_x + 9, close_btn_y + 6))
+
+        # Two-column layout
+        col1_x = modal_x + 30
+        col2_x = modal_x + modal_width // 2 + 15
+        y = modal_y + 70
+        line_height = 22
+        section_spacing = 30
+
+        # Helper function to render a shortcut
+        def render_shortcut(x, y, key, description):
+            key_text = self.font_small.render(key, True, self.CYAN)
+            self.screen.blit(key_text, (x, y))
+            desc_text = self.font_small.render(description, True, self.TEXT_NORMAL)
+            self.screen.blit(desc_text, (x + 100, y))
+
+        def render_section(x, y, title):
+            section_text = self.font_small.render(title, True, self.TEXT_DIM)
+            self.screen.blit(section_text, (x, y))
+            return y + line_height
+
+        # Column 1
+        y1 = render_section(col1_x, y, "TEACHING")
+        render_shortcut(col1_x, y1, "R", "Reward")
+        y1 += line_height
+        render_shortcut(col1_x, y1, "X", "Punish")
+        y1 += line_height
+        render_shortcut(col1_x, y1, "SPACE", "Push-to-Talk")
+        y1 += section_spacing
+
+        y1 = render_section(col1_x, y1, "TIME CONTROL")
+        render_shortcut(col1_x, y1, "[", "Slow Down")
+        y1 += line_height
+        render_shortcut(col1_x, y1, "]", "Speed Up")
+        y1 += line_height
+        render_shortcut(col1_x, y1, "\\", "Reset Speed")
+        y1 += line_height
+        render_shortcut(col1_x, y1, "P", "Pause")
+        y1 += section_spacing
+
+        y1 = render_section(col1_x, y1, "SPAWNING")
+        render_shortcut(col1_x, y1, "F", "Spawn Food")
+        y1 += line_height
+        render_shortcut(col1_x, y1, "V", "Spawn Vegetation")
+        y1 += line_height
+        render_shortcut(col1_x, y1, "W", "Spawn Water")
+        y1 += line_height
+        render_shortcut(col1_x, y1, "Shift+P", "Spawn Predator")
+        y1 += line_height
+        render_shortcut(col1_x, y1, "D", "Delete Vegetation")
+        y1 += section_spacing
+
+        # Column 2
+        y2 = render_section(col2_x, y, "AGENT CONTROL")
+        render_shortcut(col2_x, y2, "1-9", "Select Agent")
+        y2 += line_height
+        render_shortcut(col2_x, y2, "T", "Heal Agent")
+        y2 += line_height
+        render_shortcut(col2_x, y2, "C", "Control Mode")
+        y2 += line_height
+        render_shortcut(col2_x, y2, "Arrows", "Move Agent")
+        y2 += section_spacing
+
+        y2 = render_section(col2_x, y2, "SAVE/LOAD")
+        render_shortcut(col2_x, y2, "S", "Save Agent")
+        y2 += line_height
+        render_shortcut(col2_x, y2, "Shift+S", "Save All Agents")
+        y2 += line_height
+        render_shortcut(col2_x, y2, "L", "List Saved")
+        y2 += line_height
+        render_shortcut(col2_x, y2, "M", "Save Map")
+        y2 += line_height
+        render_shortcut(col2_x, y2, "Shift+M", "Load Map")
+        y2 += section_spacing
+
+        y2 = render_section(col2_x, y2, "PANELS")
+        render_shortcut(col2_x, y2, "TAB", "Toggle Left Panel")
+        y2 += line_height
+        render_shortcut(col2_x, y2, "Shift+TAB", "Toggle Right Panel")
+        y2 += line_height
+        render_shortcut(col2_x, y2, "Shift+H", "Toggle HUD")
+        y2 += line_height
+        render_shortcut(col2_x, y2, "H / ?", "Help (This Screen)")
+        y2 += line_height
+        render_shortcut(col2_x, y2, "ESC", "Close / Quit")
+
     def _render(self) -> None:
         """Render full frame."""
         self.screen.fill(self.BG_DARKEST)
@@ -1512,6 +1651,9 @@ class CockpitApp:
 
         # Render pygame-gui
         self.ui_manager.draw_ui(self.screen)
+
+        # Render help modal (on top of everything)
+        self._render_help_modal()
 
         pygame.display.flip()
 
