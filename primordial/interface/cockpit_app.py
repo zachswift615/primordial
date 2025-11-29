@@ -625,9 +625,9 @@ class CockpitApp:
 
     def _update(self, dt: float) -> None:
         """Update simulation and UI."""
-        # Control mode - arrow keys move selected agent
-        if self.control_mode and not self.paused:
-            wrapper = self._get_target_agent_wrapper()
+        # Control mode - arrow keys move selected agent (only the explicitly selected agent)
+        if self.control_mode and not self.paused and self.selected_agent_id:
+            wrapper = self.simulation.agents.get(self.selected_agent_id)
             if wrapper and wrapper.agent.is_alive:
                 keys = pygame.key.get_pressed()
                 thrust = 0.0
@@ -1903,6 +1903,10 @@ class CockpitApp:
             self.simulation.world.remove_entity(v.id)
         for p in list(self.simulation.world.predators):
             self.simulation.world.remove_entity(p.id)
+        # Clear water (static_entities that are Water)
+        for w in list(self.simulation.world.static_entities):
+            if isinstance(w, Water):
+                self.simulation.world.remove_entity(w.id)
 
         # Load food
         for fd in map_data.get('food_positions', []):
@@ -1931,6 +1935,15 @@ class CockpitApp:
                 patrol_radius=pd.get('patrol_radius', 150.0),
             )
             self.simulation.world.add_entity(pred)
+
+        # Load water
+        for wd in map_data.get('water', []):
+            water = Water(
+                entity_id=self.simulation.world.next_entity_id,
+                position=Vec2(wd['x'], wd['y']),
+                radius=wd.get('radius', 30.0),
+            )
+            self.simulation.world.add_entity(water)
 
         print(f"Loaded map from {map_files[0].name}")
 
