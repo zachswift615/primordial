@@ -1,0 +1,1936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Primordial - Single Player Training Mode</title>
+    <style>
+        /* ============================================
+           CSS VARIABLES - Sci-Fi/Neon Theme
+           ============================================ */
+        :root {
+            --bg-darkest: #0a0a12;
+            --bg-dark: #12121a;
+            --bg-panel: #1a1a24;
+            --bg-input: #252530;
+            --bg-hover: #2a2a38;
+
+            --cyan: #00ffff;
+            --cyan-dim: #00aaaa;
+            --cyan-glow: rgba(0, 255, 255, 0.3);
+            --green: #00ff88;
+            --green-dim: #00aa66;
+            --red: #ff4466;
+            --red-dim: #aa3344;
+            --yellow: #ffdd44;
+            --yellow-dim: #aa9922;
+            --purple: #aa66ff;
+            --pink: #ff66aa;
+            --orange: #ff8844;
+            --gold: #ffd700;
+
+            --text-bright: #ffffff;
+            --text-normal: #ccccdd;
+            --text-dim: #888899;
+            --text-disabled: #555566;
+
+            --border-radius: 6px;
+            --font-main: 'Segoe UI', 'Roboto', sans-serif;
+            --font-mono: 'Consolas', 'Monaco', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-main);
+            font-size: 14px;
+            color: var(--text-normal);
+            background: var(--bg-darkest);
+            min-height: 100vh;
+        }
+
+        /* ============================================
+           NAVIGATION
+           ============================================ */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-dark);
+            border-bottom: 2px solid var(--cyan);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            z-index: 1000;
+        }
+
+        .nav-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .nav-divider {
+            width: 1px;
+            height: 24px;
+            background: var(--bg-hover);
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-tab {
+            padding: 8px 16px;
+            background: var(--bg-input);
+            border: 1px solid transparent;
+            border-radius: var(--border-radius);
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .nav-tab:hover {
+            background: var(--bg-hover);
+            color: var(--text-normal);
+        }
+
+        .nav-tab.active {
+            background: var(--cyan-dim);
+            border-color: var(--cyan);
+            color: var(--bg-darkest);
+            font-weight: bold;
+        }
+
+        /* ============================================
+           MAIN CONTAINER
+           ============================================ */
+        .container {
+            padding-top: 74px;
+        }
+
+        .section {
+            display: none;
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .section-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--cyan);
+            margin-bottom: 8px;
+        }
+
+        .section-subtitle {
+            color: var(--text-dim);
+            margin-bottom: 24px;
+            font-size: 15px;
+        }
+
+        /* ============================================
+           COMMON COMPONENTS
+           ============================================ */
+        .card {
+            background: var(--bg-panel);
+            border: 1px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: var(--bg-dark);
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--bg-hover);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--cyan-dim);
+            color: var(--bg-darkest);
+        }
+
+        .btn-primary:hover {
+            background: var(--cyan);
+            box-shadow: 0 0 15px var(--cyan-glow);
+        }
+
+        .btn-secondary {
+            background: var(--bg-input);
+            color: var(--text-normal);
+            border: 1px solid var(--bg-hover);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            border-color: var(--cyan-dim);
+        }
+
+        .btn-danger {
+            background: var(--red-dim);
+            color: var(--text-bright);
+        }
+
+        .btn-danger:hover {
+            background: var(--red);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        /* ============================================
+           AGENT STABLE SECTION
+           ============================================ */
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .agent-card {
+            background: var(--bg-panel);
+            border: 2px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .agent-card:hover {
+            border-color: var(--cyan-dim);
+            transform: translateY(-2px);
+        }
+
+        .agent-card.selected {
+            border-color: var(--cyan);
+            box-shadow: 0 0 20px var(--cyan-glow);
+        }
+
+        .agent-card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .agent-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--cyan-dim), var(--purple));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .agent-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--text-bright);
+        }
+
+        .agent-title {
+            font-size: 12px;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .agent-stats-mini {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .stat-mini {
+            text-align: center;
+            padding: 8px;
+            background: var(--bg-dark);
+            border-radius: 4px;
+        }
+
+        .stat-mini-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--text-bright);
+        }
+
+        .stat-mini-label {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        .agent-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .clone-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--purple);
+            color: var(--text-bright);
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        /* Add new agent card */
+        .agent-card-add {
+            border: 2px dashed var(--bg-hover);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+            color: var(--text-dim);
+        }
+
+        .agent-card-add:hover {
+            border-color: var(--cyan-dim);
+            color: var(--cyan);
+        }
+
+        .agent-card-add .add-icon {
+            font-size: 48px;
+            margin-bottom: 8px;
+        }
+
+        /* ============================================
+           TRAINING LEVELS SECTION
+           ============================================ */
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .level-card {
+            background: var(--bg-panel);
+            border: 2px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .level-card:hover:not(.locked) {
+            border-color: var(--cyan-dim);
+            transform: translateY(-2px);
+        }
+
+        .level-card.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .level-preview {
+            height: 120px;
+            background: var(--bg-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .level-preview-art {
+            font-size: 48px;
+            opacity: 0.3;
+        }
+
+        .level-number {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: var(--bg-darkest);
+            color: var(--cyan);
+            font-size: 12px;
+            font-weight: bold;
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+
+        .level-stars {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 4px;
+        }
+
+        .star {
+            font-size: 16px;
+            color: var(--text-disabled);
+        }
+
+        .star.earned {
+            color: var(--gold);
+        }
+
+        .level-info {
+            padding: 16px;
+        }
+
+        .level-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--text-bright);
+            margin-bottom: 4px;
+        }
+
+        .level-trains {
+            font-size: 12px;
+            color: var(--cyan);
+            margin-bottom: 8px;
+        }
+
+        .level-desc {
+            font-size: 13px;
+            color: var(--text-dim);
+            line-height: 1.4;
+        }
+
+        .level-lock-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+        }
+
+        /* ============================================
+           AGENT PROFILE SECTION
+           ============================================ */
+        .profile-header {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--cyan-dim), var(--purple));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+            flex-shrink: 0;
+        }
+
+        .profile-info {
+            flex: 1;
+        }
+
+        .profile-name {
+            font-size: 32px;
+            font-weight: bold;
+            color: var(--text-bright);
+            margin-bottom: 4px;
+        }
+
+        .profile-title {
+            font-size: 16px;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+        }
+
+        .profile-meta {
+            display: flex;
+            gap: 24px;
+            color: var(--text-dim);
+            font-size: 13px;
+        }
+
+        .profile-actions {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        /* Training Stats Breakdown */
+        .stat-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-name {
+            width: 140px;
+            font-weight: bold;
+            color: var(--text-normal);
+        }
+
+        .stat-bar-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .stat-bar {
+            flex: 1;
+            height: 24px;
+            background: var(--bg-dark);
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .stat-bar-base {
+            background: var(--text-disabled);
+            height: 100%;
+        }
+
+        .stat-bar-permanent {
+            background: var(--green);
+            height: 100%;
+        }
+
+        .stat-bar-active {
+            background: var(--cyan);
+            height: 100%;
+        }
+
+        .stat-value {
+            width: 60px;
+            text-align: right;
+            font-family: var(--font-mono);
+            font-weight: bold;
+            color: var(--text-bright);
+        }
+
+        .stat-breakdown {
+            width: 200px;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .stat-breakdown span {
+            margin-right: 8px;
+        }
+
+        .stat-breakdown .base { color: var(--text-disabled); }
+        .stat-breakdown .perm { color: var(--green); }
+        .stat-breakdown .active { color: var(--cyan); }
+
+        /* Legend */
+        .stat-legend {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: var(--bg-dark);
+            border-radius: var(--border-radius);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+
+        /* ============================================
+           CHECKPOINTS SECTION
+           ============================================ */
+        .checkpoint-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .checkpoint-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-dark);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--bg-hover);
+        }
+
+        .checkpoint-item.empty {
+            border-style: dashed;
+            opacity: 0.6;
+        }
+
+        .checkpoint-slot {
+            width: 40px;
+            height: 40px;
+            background: var(--bg-input);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--cyan);
+            font-size: 18px;
+        }
+
+        .checkpoint-info {
+            flex: 1;
+        }
+
+        .checkpoint-label {
+            font-weight: bold;
+            color: var(--text-bright);
+            margin-bottom: 4px;
+        }
+
+        .checkpoint-meta {
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .checkpoint-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* ============================================
+           TRAINING ACTIVITY FEED
+           ============================================ */
+        .activity-feed {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .activity-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .activity-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .activity-icon.speed { background: var(--orange); }
+        .activity-icon.reaction { background: var(--purple); }
+        .activity-icon.vision { background: var(--cyan-dim); }
+        .activity-icon.efficiency { background: var(--green-dim); }
+
+        .activity-content {
+            flex: 1;
+        }
+
+        .activity-text {
+            color: var(--text-normal);
+            margin-bottom: 4px;
+        }
+
+        .activity-text strong {
+            color: var(--text-bright);
+        }
+
+        .activity-gain {
+            color: var(--green);
+            font-weight: bold;
+        }
+
+        .activity-time {
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        /* ============================================
+           TRAINING SYSTEM EXPLANATION
+           ============================================ */
+        .behavior-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 16px;
+        }
+
+        .behavior-card {
+            background: var(--bg-dark);
+            border-radius: var(--border-radius);
+            padding: 16px;
+            border-left: 4px solid var(--cyan);
+        }
+
+        .behavior-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .behavior-icon {
+            font-size: 24px;
+        }
+
+        .behavior-stat {
+            font-weight: bold;
+            color: var(--cyan);
+            text-transform: uppercase;
+            font-size: 13px;
+        }
+
+        .behavior-trigger {
+            color: var(--text-normal);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* Decay explanation */
+        .decay-diagram {
+            background: var(--bg-dark);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin-top: 16px;
+        }
+
+        .decay-bar {
+            height: 40px;
+            background: var(--bg-input);
+            border-radius: 4px;
+            display: flex;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+
+        .decay-segment {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--bg-darkest);
+        }
+
+        /* ============================================
+           ACTIVE TRAINING VIEW
+           ============================================ */
+        .training-active {
+            background: var(--bg-panel);
+            border: 2px solid var(--cyan);
+            border-radius: var(--border-radius);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .training-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .training-level-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--cyan);
+        }
+
+        .training-timer {
+            font-size: 32px;
+            font-family: var(--font-mono);
+            color: var(--text-bright);
+        }
+
+        .training-stats-live {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .live-stat {
+            background: var(--bg-dark);
+            padding: 16px;
+            border-radius: var(--border-radius);
+            text-align: center;
+        }
+
+        .live-stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--text-bright);
+        }
+
+        .live-stat-change {
+            font-size: 14px;
+            color: var(--green);
+        }
+
+        .live-stat-label {
+            font-size: 12px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        /* ============================================
+           AGENT SELECTOR
+           ============================================ */
+        .agent-selector {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: var(--bg-panel);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--bg-hover);
+        }
+
+        .agent-selector-label {
+            color: var(--text-dim);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .agent-selector-dropdown {
+            flex: 1;
+            max-width: 300px;
+            position: relative;
+        }
+
+        .agent-selector-current {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg-dark);
+            border: 2px solid var(--cyan-dim);
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .agent-selector-current:hover {
+            border-color: var(--cyan);
+        }
+
+        .agent-selector-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--cyan-dim), var(--purple));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .agent-selector-info {
+            flex: 1;
+        }
+
+        .agent-selector-name {
+            font-weight: bold;
+            color: var(--text-bright);
+        }
+
+        .agent-selector-title {
+            font-size: 11px;
+            color: var(--cyan);
+            text-transform: uppercase;
+        }
+
+        .agent-selector-arrow {
+            color: var(--cyan);
+            font-size: 12px;
+        }
+
+        .agent-selector-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bg-dark);
+            border: 1px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            margin-top: 4px;
+            display: none;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .agent-selector-menu.open {
+            display: block;
+        }
+
+        .agent-selector-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .agent-selector-option:hover {
+            background: var(--bg-hover);
+        }
+
+        .agent-selector-option.selected {
+            background: var(--bg-input);
+            border-left: 3px solid var(--cyan);
+        }
+
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+        @media (max-width: 768px) {
+            .nav-tabs { flex-wrap: wrap; }
+            .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+            .profile-header { flex-direction: column; }
+            .training-stats-live { grid-template-columns: repeat(2, 1fr); }
+            .agent-selector { flex-direction: column; align-items: stretch; }
+            .agent-selector-dropdown { max-width: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <span class="nav-title">Primordial Training</span>
+        <div class="nav-divider"></div>
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showSection('stable')">Agent Stable</button>
+            <button class="nav-tab" onclick="showSection('levels')">Training Levels</button>
+            <button class="nav-tab" onclick="showSection('profile')">Agent Profile</button>
+            <button class="nav-tab" onclick="showSection('checkpoints')">Checkpoints</button>
+            <button class="nav-tab" onclick="showSection('system')">Training System</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- ============================================
+             AGENT STABLE SECTION
+             ============================================ -->
+        <div id="stable" class="section active">
+            <h1 class="section-title">Your Stable</h1>
+            <p class="section-subtitle">Manage your trained agents. Each one has developed unique abilities through their experiences.</p>
+
+            <div class="agent-grid">
+                <!-- Agent 1 - Well trained -->
+                <div class="agent-card selected">
+                    <div class="agent-card-header">
+                        <div class="agent-avatar">Z</div>
+                        <div>
+                            <div class="agent-name">Zephyr</div>
+                            <div class="agent-title">Ghost-Scout</div>
+                        </div>
+                    </div>
+                    <div class="agent-stats-mini">
+                        <div class="stat-mini">
+                            <div class="stat-mini-value">168</div>
+                            <div class="stat-mini-label">Speed</div>
+                        </div>
+                        <div class="stat-mini">
+                            <div class="stat-mini-value">224</div>
+                            <div class="stat-mini-label">Vision</div>
+                        </div>
+                        <div class="stat-mini">
+                            <div class="stat-mini-value">3.8</div>
+                            <div class="stat-mini-label">Agility</div>
+                        </div>
+                    </div>
+                    <div class="agent-meta">
+                        <span>Gen 0</span>
+                        <span>2h 15m trained</span>
+                    </div>
+                </div>
+
+                <!-- Agent 2 - Clone -->
+                <div class="agent-card">
+                    <div class="clone-badge">Clone</div>
+                    <div class="agent-card-header">
+                        <div class="agent-avatar">Z</div>
+                        <div>
+                            <div class="agent-name">Zephyr-Alpha</div>
+                            <div class="agent-title">Sprinter</div>
+                        </div>
+                    </div>
+                    <div class="agent-stats-mini">
+                        <div class="stat-mini">
+                            <div class="stat-mini-value">185</div>
+                            <div class="stat-mini-label">Speed</div>
+                        </div>
+                        <div class="stat-mini">
+                            <div class="stat-mini-value">198</div>
+                            <div class="stat-mini-label">Vision</div>
+                        </div>
+                        <div class="stat-mini">
+                            <div class="stat-mini-value">4.2</div>
+                            <div class="stat-mini-label">Agility</div>
+                        </div>
+                    </div>
+                    <div class="agent-meta">
+                        <span>Gen 1 (from Zephyr)</span>
+                        <span>45m trained</span>
+                    </div>
+                </div>
+
+                <!-- Agent 3 - Survivor type -->
+                <div class="agent-card">
+                    <div class="agent-card-header">
+                        <div class="agent-avatar">T</div>
+                        <div>
+                            <div class="agent-name">Tank</div>
+                            <div class="agent-title">Survivor</div>
+                        </div>
+                    </div>
+                    <div class="agent-stats-mini">
+                        <div class="stat-mini">
+                            <div class="stat-mini-value">142</div>
+                            <div class="stat-mini-label">Speed</div>
+                        </div>
+                        <div class="stat-mini">
+                            <div class="stat-mini-value">185</div>
+                            <div class="stat-mini-label">Vision</div>
+                        </div>
+                        <div class="stat-mini">
+                            <div class="stat-mini-value">2.9</div>
+                            <div class="stat-mini-label">Agility</div>
+                        </div>
+                    </div>
+                    <div class="agent-meta">
+                        <span>Gen 0</span>
+                        <span>3h 02m trained</span>
+                    </div>
+                </div>
+
+                <!-- Agent 4 - Tactician -->
+                <div class="agent-card">
+                    <div class="clone-badge">Gen 2</div>
+                    <div class="agent-card-header">
+                        <div class="agent-avatar">W</div>
+                        <div>
+                            <div class="agent-name">Whisper</div>
+                            <div class="agent-title">Tactician</div>
+                        </div>
+                    </div>
+                    <div class="agent-stats-mini">
+                        <div class="stat-mini">
+                            <div class="stat-mini-value">155</div>
+                            <div class="stat-mini-label">Speed</div>
+                        </div>
+                        <div class="stat-mini">
+                            <div class="stat-mini-value">210</div>
+                            <div class="stat-mini-label">Vision</div>
+                        </div>
+                        <div class="stat-mini">
+                            <div class="stat-mini-value">3.5</div>
+                            <div class="stat-mini-label">Agility</div>
+                        </div>
+                    </div>
+                    <div class="agent-meta">
+                        <span>Gen 2 (from Zephyr-Alpha)</span>
+                        <span>1h 30m trained</span>
+                    </div>
+                </div>
+
+                <!-- Add new agent -->
+                <div class="agent-card agent-card-add">
+                    <div class="add-icon">+</div>
+                    <div>Clone Selected Agent</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 24px; display: flex; gap: 12px;">
+                <button class="btn btn-primary">Deploy Selected</button>
+                <button class="btn btn-secondary">View Details</button>
+                <button class="btn btn-secondary">Clone Agent</button>
+                <button class="btn btn-danger">Delete Agent</button>
+            </div>
+        </div>
+
+        <!-- ============================================
+             TRAINING LEVELS SECTION
+             ============================================ -->
+        <div id="levels" class="section">
+            <h1 class="section-title">Training Levels</h1>
+            <p class="section-subtitle">Environments designed to develop specific capabilities. Each level applies different evolutionary pressure.</p>
+
+            <div class="level-grid">
+                <!-- Level 1: Boot Camp -->
+                <div class="level-card" onclick="alert('Starting Boot Camp with selected agent...')">
+                    <div class="level-preview">
+                        <span class="level-preview-art">&#127793;</span>
+                        <span class="level-number">Level 1</span>
+                        <div class="level-stars">
+                            <span class="star earned">&#9733;</span>
+                            <span class="star earned">&#9733;</span>
+                            <span class="star earned">&#9733;</span>
+                        </div>
+                    </div>
+                    <div class="level-info">
+                        <div class="level-name">Boot Camp</div>
+                        <div class="level-trains">Trains: Vision Range, Basic Movement</div>
+                        <div class="level-desc">Open space with abundant food. No predators. Learn to find and eat food efficiently.</div>
+                    </div>
+                </div>
+
+                <!-- Level 2: The Gauntlet -->
+                <div class="level-card">
+                    <div class="level-preview">
+                        <span class="level-preview-art">&#128023;</span>
+                        <span class="level-number">Level 2</span>
+                        <div class="level-stars">
+                            <span class="star earned">&#9733;</span>
+                            <span class="star earned">&#9733;</span>
+                            <span class="star">&#9733;</span>
+                        </div>
+                    </div>
+                    <div class="level-info">
+                        <div class="level-name">The Gauntlet</div>
+                        <div class="level-trains">Trains: Reaction Time, Speed</div>
+                        <div class="level-desc">Narrow corridor with one slow predator. Learn evasion timing and when to run.</div>
+                    </div>
+                </div>
+
+                <!-- Level 3: The Maze -->
+                <div class="level-card">
+                    <div class="level-preview">
+                        <span class="level-preview-art">&#129513;</span>
+                        <span class="level-number">Level 3</span>
+                        <div class="level-stars">
+                            <span class="star earned">&#9733;</span>
+                            <span class="star">&#9733;</span>
+                            <span class="star">&#9733;</span>
+                        </div>
+                    </div>
+                    <div class="level-info">
+                        <div class="level-name">The Maze</div>
+                        <div class="level-trains">Trains: Vision Range, Navigation</div>
+                        <div class="level-desc">Complex walls with food at the end. No predators. Learn pathfinding and exploration.</div>
+                    </div>
+                </div>
+
+                <!-- Level 4: The Arena -->
+                <div class="level-card">
+                    <div class="level-preview">
+                        <span class="level-preview-art">&#9876;</span>
+                        <span class="level-number">Level 4</span>
+                        <div class="level-stars">
+                            <span class="star">&#9733;</span>
+                            <span class="star">&#9733;</span>
+                            <span class="star">&#9733;</span>
+                        </div>
+                    </div>
+                    <div class="level-info">
+                        <div class="level-name">The Arena</div>
+                        <div class="level-trains">Trains: Agility, Reaction Time</div>
+                        <div class="level-desc">Open arena with 2-3 varied predators and scattered cover. Handle multiple threats.</div>
+                    </div>
+                </div>
+
+                <!-- Level 5: The Drought -->
+                <div class="level-card">
+                    <div class="level-preview">
+                        <span class="level-preview-art">&#127786;</span>
+                        <span class="level-number">Level 5</span>
+                        <div class="level-stars">
+                            <span class="star">&#9733;</span>
+                            <span class="star">&#9733;</span>
+                            <span class="star">&#9733;</span>
+                        </div>
+                    </div>
+                    <div class="level-info">
+                        <div class="level-name">The Drought</div>
+                        <div class="level-trains">Trains: Energy Efficiency, Stamina</div>
+                        <div class="level-desc">Sparse food, one water source, patrolling predator. Master energy management.</div>
+                    </div>
+                </div>
+
+                <!-- Level 6: The Fortress (Locked) -->
+                <div class="level-card locked">
+                    <div class="level-preview">
+                        <span class="level-preview-art">&#127984;</span>
+                        <span class="level-number">Level 6</span>
+                        <div class="level-lock-overlay">&#128274;</div>
+                    </div>
+                    <div class="level-info">
+                        <div class="level-name">The Fortress</div>
+                        <div class="level-trains">Trains: Tactics</div>
+                        <div class="level-desc">Many movable objects, aggressive predators. Learn to use environment defensively.</div>
+                    </div>
+                </div>
+
+                <!-- Level 7: Pack Hunt (Locked) -->
+                <div class="level-card locked">
+                    <div class="level-preview">
+                        <span class="level-preview-art">&#128058;</span>
+                        <span class="level-number">Level 7</span>
+                        <div class="level-lock-overlay">&#128274;</div>
+                    </div>
+                    <div class="level-info">
+                        <div class="level-name">The Pack Hunt</div>
+                        <div class="level-trains">Trains: All Evasion Stats</div>
+                        <div class="level-desc">Multiple coordinated predators. Survive against hunting packs.</div>
+                    </div>
+                </div>
+
+                <!-- Level 8: Ultimate Challenge (Locked) -->
+                <div class="level-card locked">
+                    <div class="level-preview">
+                        <span class="level-preview-art">&#127942;</span>
+                        <span class="level-number">Level 8</span>
+                        <div class="level-lock-overlay">&#128274;</div>
+                    </div>
+                    <div class="level-info">
+                        <div class="level-name">Ultimate Challenge</div>
+                        <div class="level-trains">Trains: Everything</div>
+                        <div class="level-desc">All hazards combined. The true test of mastery. Can your agent survive?</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================
+             AGENT PROFILE SECTION
+             ============================================ -->
+        <div id="profile" class="section">
+            <h1 class="section-title">Agent Profile</h1>
+            <p class="section-subtitle">Detailed view of your agent's capabilities and training history.</p>
+
+            <!-- Agent Selector -->
+            <div class="agent-selector">
+                <span class="agent-selector-label">Viewing:</span>
+                <div class="agent-selector-dropdown" id="profile-agent-selector">
+                    <div class="agent-selector-current" onclick="toggleAgentMenu('profile-agent-selector')">
+                        <div class="agent-selector-avatar">Z</div>
+                        <div class="agent-selector-info">
+                            <div class="agent-selector-name">Zephyr</div>
+                            <div class="agent-selector-title">Ghost-Scout</div>
+                        </div>
+                        <span class="agent-selector-arrow">&#9660;</span>
+                    </div>
+                    <div class="agent-selector-menu">
+                        <div class="agent-selector-option selected" onclick="selectAgent('profile-agent-selector', 'Zephyr', 'Ghost-Scout', 'Z')">
+                            <div class="agent-selector-avatar">Z</div>
+                            <div class="agent-selector-info">
+                                <div class="agent-selector-name">Zephyr</div>
+                                <div class="agent-selector-title">Ghost-Scout</div>
+                            </div>
+                        </div>
+                        <div class="agent-selector-option" onclick="selectAgent('profile-agent-selector', 'Zephyr-Alpha', 'Sprinter', 'Z')">
+                            <div class="agent-selector-avatar" style="background: linear-gradient(135deg, var(--purple), var(--pink));">Z</div>
+                            <div class="agent-selector-info">
+                                <div class="agent-selector-name">Zephyr-Alpha</div>
+                                <div class="agent-selector-title">Sprinter</div>
+                            </div>
+                        </div>
+                        <div class="agent-selector-option" onclick="selectAgent('profile-agent-selector', 'Tank', 'Survivor', 'T')">
+                            <div class="agent-selector-avatar" style="background: linear-gradient(135deg, var(--green-dim), var(--cyan-dim));">T</div>
+                            <div class="agent-selector-info">
+                                <div class="agent-selector-name">Tank</div>
+                                <div class="agent-selector-title">Survivor</div>
+                            </div>
+                        </div>
+                        <div class="agent-selector-option" onclick="selectAgent('profile-agent-selector', 'Whisper', 'Tactician', 'W')">
+                            <div class="agent-selector-avatar" style="background: linear-gradient(135deg, var(--orange), var(--yellow));">W</div>
+                            <div class="agent-selector-info">
+                                <div class="agent-selector-name">Whisper</div>
+                                <div class="agent-selector-title">Tactician</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Header -->
+            <div class="profile-header">
+                <div class="profile-avatar">Z</div>
+                <div class="profile-info">
+                    <div class="profile-name">Zephyr</div>
+                    <div class="profile-title">Ghost-Scout</div>
+                    <div class="profile-meta">
+                        <span>Gen 0 (Original)</span>
+                        <span>Created: 2 days ago</span>
+                        <span>Total Training: 2h 15m</span>
+                        <span>Deaths: 12</span>
+                        <span>Food Eaten: 347</span>
+                    </div>
+                </div>
+                <div class="profile-actions">
+                    <button class="btn btn-primary">Deploy</button>
+                    <button class="btn btn-secondary">Clone</button>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Training Stats Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Training Stats</span>
+                    </div>
+                    <div class="card-body">
+                        <!-- Legend -->
+                        <div class="stat-legend">
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: var(--text-disabled)"></div>
+                                <span>Base</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: var(--green)"></div>
+                                <span>Permanent (+20%)</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: var(--cyan)"></div>
+                                <span>Active (+80%, decays)</span>
+                            </div>
+                        </div>
+
+                        <!-- Stat Rows -->
+                        <div class="stat-row">
+                            <div class="stat-name">Max Speed</div>
+                            <div class="stat-bar-container">
+                                <div class="stat-bar">
+                                    <div class="stat-bar-base" style="width: 60%"></div>
+                                    <div class="stat-bar-permanent" style="width: 4%"></div>
+                                    <div class="stat-bar-active" style="width: 8%"></div>
+                                </div>
+                                <div class="stat-value">168.2</div>
+                            </div>
+                            <div class="stat-breakdown">
+                                <span class="base">150.0</span>
+                                <span class="perm">+3.6</span>
+                                <span class="active">+14.6</span>
+                            </div>
+                        </div>
+
+                        <div class="stat-row">
+                            <div class="stat-name">Vision Range</div>
+                            <div class="stat-bar-container">
+                                <div class="stat-bar">
+                                    <div class="stat-bar-base" style="width: 50%"></div>
+                                    <div class="stat-bar-permanent" style="width: 6%"></div>
+                                    <div class="stat-bar-active" style="width: 6%"></div>
+                                </div>
+                                <div class="stat-value">224.1</div>
+                            </div>
+                            <div class="stat-breakdown">
+                                <span class="base">200.0</span>
+                                <span class="perm">+4.8</span>
+                                <span class="active">+19.3</span>
+                            </div>
+                        </div>
+
+                        <div class="stat-row">
+                            <div class="stat-name">Hearing Range</div>
+                            <div class="stat-bar-container">
+                                <div class="stat-bar">
+                                    <div class="stat-bar-base" style="width: 55%"></div>
+                                    <div class="stat-bar-permanent" style="width: 2%"></div>
+                                    <div class="stat-bar-active" style="width: 3%"></div>
+                                </div>
+                                <div class="stat-value">312.4</div>
+                            </div>
+                            <div class="stat-breakdown">
+                                <span class="base">300.0</span>
+                                <span class="perm">+2.5</span>
+                                <span class="active">+9.9</span>
+                            </div>
+                        </div>
+
+                        <div class="stat-row">
+                            <div class="stat-name">Agility</div>
+                            <div class="stat-bar-container">
+                                <div class="stat-bar">
+                                    <div class="stat-bar-base" style="width: 50%"></div>
+                                    <div class="stat-bar-permanent" style="width: 8%"></div>
+                                    <div class="stat-bar-active" style="width: 5%"></div>
+                                </div>
+                                <div class="stat-value">3.82</div>
+                            </div>
+                            <div class="stat-breakdown">
+                                <span class="base">3.0</span>
+                                <span class="perm">+0.16</span>
+                                <span class="active">+0.66</span>
+                            </div>
+                        </div>
+
+                        <div class="stat-row">
+                            <div class="stat-name">Efficiency</div>
+                            <div class="stat-bar-container">
+                                <div class="stat-bar">
+                                    <div class="stat-bar-base" style="width: 60%"></div>
+                                    <div class="stat-bar-permanent" style="width: 1%"></div>
+                                    <div class="stat-bar-active" style="width: 1%"></div>
+                                </div>
+                                <div class="stat-value">0.92</div>
+                            </div>
+                            <div class="stat-breakdown">
+                                <span class="base">0.90</span>
+                                <span class="perm">+0.004</span>
+                                <span class="active">+0.016</span>
+                            </div>
+                        </div>
+
+                        <div class="stat-row">
+                            <div class="stat-name">Max Health</div>
+                            <div class="stat-bar-container">
+                                <div class="stat-bar">
+                                    <div class="stat-bar-base" style="width: 65%"></div>
+                                    <div class="stat-bar-permanent" style="width: 0%"></div>
+                                    <div class="stat-bar-active" style="width: 0%"></div>
+                                </div>
+                                <div class="stat-value">100.0</div>
+                            </div>
+                            <div class="stat-breakdown">
+                                <span class="base">100.0</span>
+                                <span class="perm">+0.0</span>
+                                <span class="active">+0.0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Training Activity Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Recent Training Activity</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="activity-feed">
+                            <div class="activity-item">
+                                <div class="activity-icon speed">&#127939;</div>
+                                <div class="activity-content">
+                                    <div class="activity-text">
+                                        <strong>Zephyr</strong> trained <strong>Speed</strong> through sustained running
+                                        <span class="activity-gain">+0.10</span>
+                                    </div>
+                                    <div class="activity-time">2 minutes ago</div>
+                                </div>
+                            </div>
+
+                            <div class="activity-item">
+                                <div class="activity-icon reaction">&#9889;</div>
+                                <div class="activity-content">
+                                    <div class="activity-text">
+                                        <strong>Zephyr</strong> trained <strong>Reaction Time</strong> via narrow escape!
+                                        <span class="activity-gain">+0.20</span>
+                                    </div>
+                                    <div class="activity-time">3 minutes ago</div>
+                                </div>
+                            </div>
+
+                            <div class="activity-item">
+                                <div class="activity-icon vision">&#128065;</div>
+                                <div class="activity-content">
+                                    <div class="activity-text">
+                                        <strong>Zephyr</strong> trained <strong>Vision</strong> by spotting distant food
+                                        <span class="activity-gain">+0.05</span>
+                                    </div>
+                                    <div class="activity-time">5 minutes ago</div>
+                                </div>
+                            </div>
+
+                            <div class="activity-item">
+                                <div class="activity-icon speed">&#127939;</div>
+                                <div class="activity-content">
+                                    <div class="activity-text">
+                                        <strong>Zephyr</strong> trained <strong>Speed</strong> through sustained running
+                                        <span class="activity-gain">+0.10</span>
+                                    </div>
+                                    <div class="activity-time">6 minutes ago</div>
+                                </div>
+                            </div>
+
+                            <div class="activity-item">
+                                <div class="activity-icon reaction">&#9889;</div>
+                                <div class="activity-content">
+                                    <div class="activity-text">
+                                        <strong>Zephyr</strong> trained <strong>Reaction Time</strong> via escape
+                                        <span class="activity-gain">+0.10</span>
+                                    </div>
+                                    <div class="activity-time">8 minutes ago</div>
+                                </div>
+                            </div>
+
+                            <div class="activity-item">
+                                <div class="activity-icon efficiency">&#128994;</div>
+                                <div class="activity-content">
+                                    <div class="activity-text">
+                                        <strong>Zephyr</strong> trained <strong>Efficiency</strong> by surviving on low energy
+                                        <span class="activity-gain">+0.02</span>
+                                    </div>
+                                    <div class="activity-time">12 minutes ago</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clone Lineage -->
+            <div class="card" style="margin-top: 24px;">
+                <div class="card-header">
+                    <span class="card-title">Clone Lineage</span>
+                </div>
+                <div class="card-body">
+                    <div style="display: flex; align-items: center; gap: 24px; font-size: 13px;">
+                        <div style="text-align: center;">
+                            <div style="width: 60px; height: 60px; border-radius: 50%; background: var(--cyan-dim); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 8px;">Z</div>
+                            <div style="font-weight: bold; color: var(--text-bright);">Zephyr</div>
+                            <div style="color: var(--text-dim); font-size: 11px;">Gen 0 (Original)</div>
+                        </div>
+                        <div style="color: var(--text-dim);">&#8594;</div>
+                        <div style="text-align: center;">
+                            <div style="width: 60px; height: 60px; border-radius: 50%; background: var(--purple); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 8px;">Z</div>
+                            <div style="font-weight: bold; color: var(--text-bright);">Zephyr-Alpha</div>
+                            <div style="color: var(--text-dim); font-size: 11px;">Gen 1</div>
+                        </div>
+                        <div style="color: var(--text-dim);">&#8594;</div>
+                        <div style="text-align: center;">
+                            <div style="width: 60px; height: 60px; border-radius: 50%; background: var(--orange); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 8px;">W</div>
+                            <div style="font-weight: bold; color: var(--text-bright);">Whisper</div>
+                            <div style="color: var(--text-dim); font-size: 11px;">Gen 2</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================
+             CHECKPOINTS SECTION
+             ============================================ -->
+        <div id="checkpoints" class="section">
+            <h1 class="section-title">Checkpoints</h1>
+            <p class="section-subtitle">Save your agent's state at key moments. Restore if training goes wrong.</p>
+
+            <!-- Agent Selector -->
+            <div class="agent-selector">
+                <span class="agent-selector-label">Agent:</span>
+                <div class="agent-selector-dropdown" id="checkpoint-agent-selector">
+                    <div class="agent-selector-current" onclick="toggleAgentMenu('checkpoint-agent-selector')">
+                        <div class="agent-selector-avatar">Z</div>
+                        <div class="agent-selector-info">
+                            <div class="agent-selector-name">Zephyr</div>
+                            <div class="agent-selector-title">Ghost-Scout</div>
+                        </div>
+                        <span class="agent-selector-arrow">&#9660;</span>
+                    </div>
+                    <div class="agent-selector-menu">
+                        <div class="agent-selector-option selected" onclick="selectAgent('checkpoint-agent-selector', 'Zephyr', 'Ghost-Scout', 'Z')">
+                            <div class="agent-selector-avatar">Z</div>
+                            <div class="agent-selector-info">
+                                <div class="agent-selector-name">Zephyr</div>
+                                <div class="agent-selector-title">Ghost-Scout</div>
+                            </div>
+                        </div>
+                        <div class="agent-selector-option" onclick="selectAgent('checkpoint-agent-selector', 'Zephyr-Alpha', 'Sprinter', 'Z')">
+                            <div class="agent-selector-avatar" style="background: linear-gradient(135deg, var(--purple), var(--pink));">Z</div>
+                            <div class="agent-selector-info">
+                                <div class="agent-selector-name">Zephyr-Alpha</div>
+                                <div class="agent-selector-title">Sprinter</div>
+                            </div>
+                        </div>
+                        <div class="agent-selector-option" onclick="selectAgent('checkpoint-agent-selector', 'Tank', 'Survivor', 'T')">
+                            <div class="agent-selector-avatar" style="background: linear-gradient(135deg, var(--green-dim), var(--cyan-dim));">T</div>
+                            <div class="agent-selector-info">
+                                <div class="agent-selector-name">Tank</div>
+                                <div class="agent-selector-title">Survivor</div>
+                            </div>
+                        </div>
+                        <div class="agent-selector-option" onclick="selectAgent('checkpoint-agent-selector', 'Whisper', 'Tactician', 'W')">
+                            <div class="agent-selector-avatar" style="background: linear-gradient(135deg, var(--orange), var(--yellow));">W</div>
+                            <div class="agent-selector-info">
+                                <div class="agent-selector-name">Whisper</div>
+                                <div class="agent-selector-title">Tactician</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title" id="checkpoint-agent-name">Zephyr - 5 Checkpoint Slots</span>
+                        <button class="btn btn-primary" style="padding: 6px 12px; font-size: 11px;">Save Current</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="checkpoint-list">
+                            <div class="checkpoint-item">
+                                <div class="checkpoint-slot">1</div>
+                                <div class="checkpoint-info">
+                                    <div class="checkpoint-label">"Before Gauntlet"</div>
+                                    <div class="checkpoint-meta">Saved 2 hours ago | Speed: 155 | Vision: 210 | Title: Scout</div>
+                                </div>
+                                <div class="checkpoint-actions">
+                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 11px;">Load</button>
+                                    <button class="btn btn-danger" style="padding: 6px 12px; font-size: 11px;">Delete</button>
+                                </div>
+                            </div>
+
+                            <div class="checkpoint-item">
+                                <div class="checkpoint-slot">2</div>
+                                <div class="checkpoint-info">
+                                    <div class="checkpoint-label">"Post-Maze Master"</div>
+                                    <div class="checkpoint-meta">Saved 45 min ago | Speed: 160 | Vision: 220 | Title: Ghost-Scout</div>
+                                </div>
+                                <div class="checkpoint-actions">
+                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 11px;">Load</button>
+                                    <button class="btn btn-danger" style="padding: 6px 12px; font-size: 11px;">Delete</button>
+                                </div>
+                            </div>
+
+                            <div class="checkpoint-item">
+                                <div class="checkpoint-slot">3</div>
+                                <div class="checkpoint-info">
+                                    <div class="checkpoint-label">"Arena Attempt 1"</div>
+                                    <div class="checkpoint-meta">Saved 20 min ago | Speed: 165 | Vision: 222 | Title: Ghost-Scout</div>
+                                </div>
+                                <div class="checkpoint-actions">
+                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 11px;">Load</button>
+                                    <button class="btn btn-danger" style="padding: 6px 12px; font-size: 11px;">Delete</button>
+                                </div>
+                            </div>
+
+                            <div class="checkpoint-item empty">
+                                <div class="checkpoint-slot">4</div>
+                                <div class="checkpoint-info">
+                                    <div class="checkpoint-label" style="color: var(--text-dim);">Empty Slot</div>
+                                    <div class="checkpoint-meta">Click "Save Current" to use this slot</div>
+                                </div>
+                            </div>
+
+                            <div class="checkpoint-item empty">
+                                <div class="checkpoint-slot">5</div>
+                                <div class="checkpoint-info">
+                                    <div class="checkpoint-label" style="color: var(--text-dim);">Empty Slot</div>
+                                    <div class="checkpoint-meta">Click "Save Current" to use this slot</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Checkpoint Tips</span>
+                    </div>
+                    <div class="card-body">
+                        <ul style="line-height: 2; color: var(--text-dim);">
+                            <li><strong style="color: var(--text-normal);">Before risky training:</strong> Save before attempting difficult levels</li>
+                            <li><strong style="color: var(--text-normal);">After breakthroughs:</strong> Capture good training moments</li>
+                            <li><strong style="color: var(--text-normal);">Branching paths:</strong> Save, then clone to try different training approaches</li>
+                            <li><strong style="color: var(--text-normal);">Recovery:</strong> If your agent learns bad habits, restore from earlier</li>
+                            <li><strong style="color: var(--text-normal);">Compare:</strong> Load old checkpoints to see how much your agent improved</li>
+                        </ul>
+
+                        <div style="margin-top: 20px; padding: 16px; background: var(--bg-dark); border-radius: var(--border-radius); border-left: 4px solid var(--yellow);">
+                            <strong style="color: var(--yellow);">Note:</strong>
+                            <span style="color: var(--text-dim);">Checkpoints save the full agent state including neural network weights and all training gains. Loading a checkpoint will overwrite current state.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================
+             TRAINING SYSTEM SECTION
+             ============================================ -->
+        <div id="system" class="section">
+            <h1 class="section-title">Training System</h1>
+            <p class="section-subtitle">Understanding how your agents develop. Stats grow from behavior - "use it, build it."</p>
+
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <span class="card-title">Core Philosophy</span>
+                </div>
+                <div class="card-body">
+                    <p style="font-size: 18px; color: var(--cyan); margin-bottom: 16px; font-style: italic;">
+                        "Stats are autobiography, not biography."
+                    </p>
+                    <p style="color: var(--text-dim); line-height: 1.6;">
+                        Your agent's stats tell the story of what it survived. You don't assign stats with sliders -
+                        your agent earns them through experience. An agent that runs a lot becomes fast.
+                        An agent that escapes predators develops quick reflexes. The stats reflect the life lived.
+                    </p>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <span class="card-title">Behavior &#8594; Stat Mapping</span>
+                </div>
+                <div class="card-body">
+                    <div class="behavior-grid">
+                        <div class="behavior-card" style="border-color: var(--orange);">
+                            <div class="behavior-header">
+                                <span class="behavior-icon">&#127939;</span>
+                                <span class="behavior-stat">Max Speed</span>
+                            </div>
+                            <div class="behavior-trigger">
+                                <strong>Trigger:</strong> Sustained running at 50%+ max speed for ~1 second
+                            </div>
+                        </div>
+
+                        <div class="behavior-card" style="border-color: var(--purple);">
+                            <div class="behavior-header">
+                                <span class="behavior-icon">&#9889;</span>
+                                <span class="behavior-stat">Reaction Time</span>
+                            </div>
+                            <div class="behavior-trigger">
+                                <strong>Trigger:</strong> Escaping from predator danger zone without taking damage
+                            </div>
+                        </div>
+
+                        <div class="behavior-card" style="border-color: var(--cyan);">
+                            <div class="behavior-header">
+                                <span class="behavior-icon">&#128065;</span>
+                                <span class="behavior-stat">Vision Range</span>
+                            </div>
+                            <div class="behavior-trigger">
+                                <strong>Trigger:</strong> Moving toward food spotted at edge of vision range
+                            </div>
+                        </div>
+
+                        <div class="behavior-card" style="border-color: var(--yellow);">
+                            <div class="behavior-header">
+                                <span class="behavior-icon">&#128066;</span>
+                                <span class="behavior-stat">Hearing Range</span>
+                            </div>
+                            <div class="behavior-trigger">
+                                <strong>Trigger:</strong> Reacting to sounds before visual confirmation
+                            </div>
+                        </div>
+
+                        <div class="behavior-card" style="border-color: var(--green);">
+                            <div class="behavior-header">
+                                <span class="behavior-icon">&#128994;</span>
+                                <span class="behavior-stat">Efficiency</span>
+                            </div>
+                            <div class="behavior-trigger">
+                                <strong>Trigger:</strong> Surviving and moving while below 30% energy
+                            </div>
+                        </div>
+
+                        <div class="behavior-card" style="border-color: var(--red);">
+                            <div class="behavior-header">
+                                <span class="behavior-icon">&#128170;</span>
+                                <span class="behavior-stat">Max Health</span>
+                            </div>
+                            <div class="behavior-trigger">
+                                <strong>Trigger:</strong> Taking damage, surviving, and recovering
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Permanent vs Active Gains</span>
+                </div>
+                <div class="card-body">
+                    <p style="margin-bottom: 16px; color: var(--text-dim);">
+                        When your agent trains a stat, the gain is split into two parts:
+                    </p>
+
+                    <div class="decay-diagram">
+                        <div class="decay-bar">
+                            <div class="decay-segment" style="width: 60%; background: var(--text-disabled);">Base (150)</div>
+                            <div class="decay-segment" style="width: 8%; background: var(--green);">Perm (+12)</div>
+                            <div class="decay-segment" style="width: 20%; background: var(--cyan);">Active (+30)</div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-dim);">
+                            <span>Example: Max Speed = 150 + 12 + 30 = 192</span>
+                            <span>Total trained: +42 (12 permanent, 30 active)</span>
+                        </div>
+                    </div>
+
+                    <div class="grid-2" style="margin-top: 24px;">
+                        <div style="padding: 16px; background: var(--bg-dark); border-radius: var(--border-radius); border-left: 4px solid var(--green);">
+                            <h4 style="color: var(--green); margin-bottom: 8px;">Permanent Gains (20%)</h4>
+                            <ul style="color: var(--text-dim); line-height: 1.8; font-size: 13px;">
+                                <li>Never decay</li>
+                                <li>Represent "muscle memory"</li>
+                                <li>Transfer to clones</li>
+                                <li>Your baseline improvement</li>
+                            </ul>
+                        </div>
+                        <div style="padding: 16px; background: var(--bg-dark); border-radius: var(--border-radius); border-left: 4px solid var(--cyan);">
+                            <h4 style="color: var(--cyan); margin-bottom: 8px;">Active Gains (80%)</h4>
+                            <ul style="color: var(--text-dim); line-height: 1.8; font-size: 13px;">
+                                <li>Decay slowly when not exercised</li>
+                                <li>Represent "current fitness"</li>
+                                <li>Transfer to clones at current level</li>
+                                <li>Keeps specialists specialized</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px; padding: 16px; background: var(--bg-dark); border-radius: var(--border-radius);">
+                        <h4 style="color: var(--text-bright); margin-bottom: 8px;">Why decay?</h4>
+                        <p style="color: var(--text-dim); font-size: 13px; line-height: 1.6;">
+                            Decay ensures your agents stay specialized. Without it, every agent would eventually max out all stats.
+                            With decay, a "Sprinter" who stops running will gradually become less fast, making room for other abilities.
+                            This creates meaningful choices about how to train your agents.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showSection(id) {
+            // Hide all sections
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            // Show selected section
+            document.getElementById(id).classList.add('active');
+
+            // Update nav tabs
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Close any open agent menus
+            document.querySelectorAll('.agent-selector-menu').forEach(m => m.classList.remove('open'));
+        }
+
+        // Agent card selection in stable
+        document.querySelectorAll('.agent-card:not(.agent-card-add)').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.agent-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+
+        // Toggle agent selector dropdown
+        function toggleAgentMenu(selectorId) {
+            const selector = document.getElementById(selectorId);
+            const menu = selector.querySelector('.agent-selector-menu');
+
+            // Close other menus first
+            document.querySelectorAll('.agent-selector-menu').forEach(m => {
+                if (m !== menu) m.classList.remove('open');
+            });
+
+            menu.classList.toggle('open');
+        }
+
+        // Select agent from dropdown
+        function selectAgent(selectorId, name, title, initial) {
+            const selector = document.getElementById(selectorId);
+            const current = selector.querySelector('.agent-selector-current');
+            const menu = selector.querySelector('.agent-selector-menu');
+
+            // Update current display
+            current.querySelector('.agent-selector-name').textContent = name;
+            current.querySelector('.agent-selector-title').textContent = title;
+            current.querySelector('.agent-selector-avatar').textContent = initial;
+
+            // Update selected state in menu
+            menu.querySelectorAll('.agent-selector-option').forEach(opt => {
+                opt.classList.remove('selected');
+                if (opt.querySelector('.agent-selector-name').textContent === name) {
+                    opt.classList.add('selected');
+                }
+            });
+
+            // Close menu
+            menu.classList.remove('open');
+
+            // Update checkpoint card title if this is checkpoint selector
+            if (selectorId === 'checkpoint-agent-selector') {
+                document.getElementById('checkpoint-agent-name').textContent = name + ' - 5 Checkpoint Slots';
+            }
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.agent-selector-dropdown')) {
+                document.querySelectorAll('.agent-selector-menu').forEach(m => m.classList.remove('open'));
+            }
+        });
+    </script>
+</body>
+</html>
