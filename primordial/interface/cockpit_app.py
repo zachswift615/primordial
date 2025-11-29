@@ -170,6 +170,16 @@ class CockpitApp:
             "chase_abandon_distance": 350.0,
         }
 
+        # Presets
+        self.presets = {
+            "Easy": {"max_agents": 3, "predator_count": 1, "initial_food": 80},
+            "Normal": {"max_agents": 5, "predator_count": 2, "initial_food": 50},
+            "Hard": {"max_agents": 8, "predator_count": 4, "initial_food": 30},
+            "Chaos": {"max_agents": 15, "predator_count": 6, "initial_food": 100},
+        }
+        self.current_preset = "Normal"
+        self._load_custom_presets()
+
         # Active slider being dragged
         self.active_slider = None
 
@@ -329,6 +339,19 @@ class CockpitApp:
                     # Apply to all predators button
                     if hasattr(self, 'apply_pred_btn_rect') and self.apply_pred_btn_rect.collidepoint(mouse_pos):
                         self._apply_predator_config()
+
+                # Presets tab buttons
+                if self.left_panel_visible and self.left_panel_tab == "presets":
+                    if hasattr(self, 'preset_btn_rects'):
+                        for name, rect in self.preset_btn_rects.items():
+                            if rect.collidepoint(mouse_pos):
+                                self._apply_preset(name)
+                                break
+
+                    # Save preset button (simple implementation - uses timestamp name)
+                    if hasattr(self, 'save_preset_btn_rect') and self.save_preset_btn_rect.collidepoint(mouse_pos):
+                        name = f"Custom_{datetime.now().strftime('%H%M%S')}"
+                        self._save_current_as_preset(name)
 
                 # Agent table row clicks - check FIRST to prevent race condition with world click
                 if self.right_panel_visible and hasattr(self, 'agent_table_rows'):
@@ -989,6 +1012,63 @@ class CockpitApp:
             self.screen.blit(apply_text, (apply_rect.centerx - apply_text.get_width() // 2, y + 6))
             self.apply_pred_btn_rect = apply_rect
 
+        elif self.left_panel_tab == "presets":
+            # BUILT-IN PRESETS section
+            section = self.font_small.render("BUILT-IN PRESETS", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            self.preset_btn_rects = {}
+            builtin = ["Easy", "Normal", "Hard", "Chaos"]
+            btn_width = (width - 8) // 2
+            for i, name in enumerate(builtin):
+                bx = x + (i % 2) * (btn_width + 8)
+                by = y + (i // 2) * 34
+                btn_rect = pygame.Rect(bx, by, btn_width, 28)
+
+                is_current = (name == self.current_preset)
+                bg_color = self.CYAN_DIM if is_current else (37, 37, 48)
+                text_color = self.TEXT_BRIGHT if is_current else self.CYAN
+
+                pygame.draw.rect(self.screen, bg_color, btn_rect, border_radius=4)
+                pygame.draw.rect(self.screen, self.CYAN_DIM, btn_rect, 1, border_radius=4)
+                btn_text = self.font_small.render(name, True, text_color)
+                self.screen.blit(btn_text, (btn_rect.centerx - btn_text.get_width() // 2, by + 6))
+                self.preset_btn_rects[name] = btn_rect
+
+            y += 76
+
+            # CUSTOM PRESETS section
+            custom_presets = [k for k in self.presets.keys() if k not in builtin]
+            if custom_presets:
+                section = self.font_small.render("CUSTOM PRESETS", True, self.TEXT_DIM)
+                self.screen.blit(section, (x, y))
+                pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+                y += 24
+
+                for name in custom_presets[:4]:  # Max 4 custom presets shown
+                    btn_rect = pygame.Rect(x, y, width, 28)
+                    is_current = (name == self.current_preset)
+                    bg_color = self.CYAN_DIM if is_current else (37, 37, 48)
+                    text_color = self.TEXT_BRIGHT if is_current else self.CYAN
+
+                    pygame.draw.rect(self.screen, bg_color, btn_rect, border_radius=4)
+                    pygame.draw.rect(self.screen, self.CYAN_DIM, btn_rect, 1, border_radius=4)
+                    btn_text = self.font_small.render(name, True, text_color)
+                    self.screen.blit(btn_text, (btn_rect.centerx - btn_text.get_width() // 2, y + 6))
+                    self.preset_btn_rects[name] = btn_rect
+                    y += 34
+
+            # Save current as preset button
+            y += 8
+            save_rect = pygame.Rect(x, y, width, 28)
+            pygame.draw.rect(self.screen, (37, 37, 48), save_rect, border_radius=4)
+            pygame.draw.rect(self.screen, self.GREEN, save_rect, 1, border_radius=4)
+            save_text = self.font_small.render("Save Current as Preset...", True, self.GREEN)
+            self.screen.blit(save_text, (save_rect.centerx - save_text.get_width() // 2, y + 6))
+            self.save_preset_btn_rect = save_rect
+
         else:
             # Placeholder for other tabs
             content_text = self.font_small.render(f"[{self.left_panel_tab.upper()} controls]", True, self.TEXT_DIM)
@@ -1233,6 +1313,50 @@ class CockpitApp:
                 predator.chase_abandon_distance = self.predator_config["chase_abandon_distance"]
                 count += 1
         print(f"Applied predator config to {count} predators")
+
+    def _load_custom_presets(self) -> None:
+        """Load custom presets from file."""
+        if self.presets_file.exists():
+            try:
+                with open(self.presets_file) as f:
+                    custom = json.load(f)
+                    self.presets.update(custom)
+            except Exception as e:
+                print(f"Warning: Could not load custom presets: {e}")
+
+    def _save_current_as_preset(self, name: str) -> None:
+        """Save current configuration as a preset."""
+        preset = {
+            "max_agents": self.control_values["max_agents"],
+            "predator_count": self.control_values["predator_count"],
+            "initial_food": self.control_values["initial_food"],
+            "max_food": self.control_values["max_food"],
+            "tick_rate": self.control_values["tick_rate"],
+        }
+        self.presets[name] = preset
+
+        # Save custom presets (excluding built-ins)
+        custom = {k: v for k, v in self.presets.items()
+                  if k not in ["Easy", "Normal", "Hard", "Chaos"]}
+        try:
+            with open(self.presets_file, 'w') as f:
+                json.dump(custom, f, indent=2)
+            print(f"Saved preset: {name}")
+        except Exception as e:
+            print(f"Error saving preset: {e}")
+
+    def _apply_preset(self, name: str) -> None:
+        """Apply a preset to current configuration."""
+        if name not in self.presets:
+            return
+        preset = self.presets[name]
+        for key, value in preset.items():
+            if key in self.control_values:
+                self.control_values[key] = value
+                if hasattr(self.sim_config, key):
+                    setattr(self.sim_config, key, value)
+        self.current_preset = name
+        print(f"Applied preset: {name}")
 
     def _get_target_agent_wrapper(self):
         """Get wrapper for selected agent or first living agent."""
