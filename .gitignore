@@ -30,3 +30,7 @@ build/
 *.whl
 
 *.pyc
+.DS_Store
+.claude
+.workshop
+**/.DS_Store
