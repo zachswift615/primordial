@@ -309,6 +309,12 @@ class CockpitApp:
                             print("Control mode OFF")
                     else:
                         print("Select an agent first (click on one)")
+                elif event.key == pygame.K_m:
+                    mods_m = pygame.key.get_mods()
+                    if mods_m & pygame.KMOD_SHIFT:
+                        self._load_map()
+                    else:
+                        self._save_map()
                 elif pygame.K_1 <= event.key <= pygame.K_9:
                     index = event.key - pygame.K_1
                     self._load_agent_by_index(index)
@@ -1829,6 +1835,104 @@ class CockpitApp:
         if wrapper:
             wrapper.events.append('human_punish')
             print(f"Punish sent to {wrapper.agent_id}")
+
+    def _save_map(self) -> None:
+        """Save current world state to file."""
+        map_data = {
+            'timestamp': datetime.now().isoformat(),
+            'world_width': self.simulation.world.width,
+            'world_height': self.simulation.world.height,
+            'food_positions': [
+                {'x': f.position.x, 'y': f.position.y, 'energy': f.energy_value}
+                for f in self.simulation.world.food_items if f.is_active
+            ],
+            'vegetation': [
+                {'x': v.position.x, 'y': v.position.y, 'radius': v.radius}
+                for v in self.simulation.world.vegetation
+            ],
+            'water': [
+                {'x': w.position.x, 'y': w.position.y, 'radius': w.radius}
+                for w in self.simulation.world.static_entities
+                if hasattr(w, 'radius')
+            ],
+            'predators': [
+                {
+                    'x': p.position.x, 'y': p.position.y,
+                    'patrol_x': p.patrol_center.x, 'patrol_y': p.patrol_center.y,
+                    'patrol_radius': p.patrol_radius
+                }
+                for p in self.simulation.world.predators if p.is_active
+            ],
+        }
+
+        # Use user data directory (set up in __init__)
+        filename = self.maps_dir / f"map_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+
+        try:
+            with open(filename, 'w') as f:
+                json.dump(map_data, f, indent=2)
+            print(f"Saved map to {filename}")
+        except Exception as e:
+            print(f"Error saving map: {e}")
+
+    def _load_map(self) -> None:
+        """Load most recent map file."""
+        from primordial.world.entities import Food, Vegetation, Water, Predator
+        from primordial.world.geometry import Vec2
+
+        # Use user data directory (set up in __init__)
+        if not self.maps_dir.exists():
+            print("No maps directory found")
+            return
+
+        map_files = sorted(self.maps_dir.glob("map_*.json"), reverse=True)
+        if not map_files:
+            print("No map files found")
+            return
+
+        try:
+            with open(map_files[0]) as f:
+                map_data = json.load(f)
+        except Exception as e:
+            print(f"Error loading map: {e}")
+            return
+
+        # Clear existing entities (except agents)
+        self.simulation.world.food_items.clear()
+        for v in list(self.simulation.world.vegetation):
+            self.simulation.world.remove_entity(v.id)
+        for p in list(self.simulation.world.predators):
+            self.simulation.world.remove_entity(p.id)
+
+        # Load food
+        for fd in map_data.get('food_positions', []):
+            food = Food(
+                entity_id=self.simulation.world.next_entity_id,
+                position=Vec2(fd['x'], fd['y']),
+                energy_value=fd.get('energy', 50.0),
+            )
+            self.simulation.world.add_entity(food)
+
+        # Load vegetation
+        for vd in map_data.get('vegetation', []):
+            veg = Vegetation(
+                entity_id=self.simulation.world.next_entity_id,
+                position=Vec2(vd['x'], vd['y']),
+                radius=vd.get('radius', 20.0),
+            )
+            self.simulation.world.add_entity(veg)
+
+        # Load predators
+        for pd in map_data.get('predators', []):
+            pred = Predator(
+                entity_id=self.simulation.world.next_entity_id,
+                position=Vec2(pd['x'], pd['y']),
+                patrol_center=Vec2(pd['patrol_x'], pd['patrol_y']),
+                patrol_radius=pd.get('patrol_radius', 150.0),
+            )
+            self.simulation.world.add_entity(pred)
+
+        print(f"Loaded map from {map_files[0].name}")
 
     def _apply_predator_config(self) -> None:
         """Apply current predator config to all active predators."""
