@@ -27,6 +27,7 @@ class CockpitApp:
     CYAN_DIM = (0, 170, 170)
     GREEN = (0, 255, 136)
     RED = (255, 68, 102)
+    YELLOW = (255, 221, 68)
     TEXT_BRIGHT = (255, 255, 255)
     TEXT_NORMAL = (204, 204, 221)
     TEXT_DIM = (136, 136, 153)
@@ -46,7 +47,11 @@ class CockpitApp:
         self.window_width = window_width
         self.window_height = window_height
 
-        # Simulation config
+        # User data directory (needed early for config loading)
+        self.user_data_dir = Path.home() / ".primordial"
+        self.user_data_dir.mkdir(exist_ok=True)
+
+        # Simulation config (defaults)
         self.sim_config = sim_config or SimulationConfig(
             world_width=800,
             world_height=600,
@@ -56,6 +61,9 @@ class CockpitApp:
             learning_enabled=True,
             render_enabled=False,
         )
+
+        # Load saved config to override defaults BEFORE creating simulation
+        self._load_sim_config_early()
 
         # State
         self.running = False
@@ -117,6 +125,9 @@ class CockpitApp:
             self.audio_capture = None
             self.audio_enabled = False
 
+        # Mic starts muted (push-to-talk)
+        self.mic_active = False
+
         # Teaching stats
         self.stats = {
             "rewards": 0,
@@ -128,6 +139,9 @@ class CockpitApp:
         self.reward_btn_rect = pygame.Rect(0, 0, 0, 0)
         self.punish_btn_rect = pygame.Rect(0, 0, 0, 0)
         self.pause_btn_rect = pygame.Rect(0, 0, 0, 0)
+
+        # Save button flash feedback (timestamp when save succeeded)
+        self.save_flash_until = 0.0
 
         # Pause state
         self.paused = False
@@ -171,6 +185,13 @@ class CockpitApp:
             "damage": 20.0,
             "attack_cooldown": 1.0,
             "chase_abandon_distance": 350.0,
+            # Energy/breeding settings
+            "initial_energy": 80.0,
+            "max_energy": 200.0,
+            "energy_drain_rate": 1.0,
+            "kill_energy_gain": 80.0,
+            "reproduction_threshold": 150.0,
+            "reproduction_cost": 70.0,
         }
 
         # Active slider being dragged
@@ -206,14 +227,12 @@ class CockpitApp:
         self.db_favorites_only = False
         self.db_agents_cache = []
 
-        # User data directory for saves (must be before presets)
-        self.user_data_dir = Path.home() / ".primordial"
-        self.user_data_dir.mkdir(exist_ok=True)
+        # Additional user data subdirectories
         self.maps_dir = self.user_data_dir / "maps"
         self.maps_dir.mkdir(exist_ok=True)
         self.presets_file = self.user_data_dir / "custom_presets.json"
 
-        # Presets (after user_data_dir setup)
+        # Presets
         self.presets = {
             "Easy": {"max_agents": 3, "predator_count": 1, "initial_food": 80},
             "Normal": {"max_agents": 5, "predator_count": 2, "initial_food": 50},
@@ -222,6 +241,9 @@ class CockpitApp:
         }
         self.current_preset = "Normal"
         self._load_custom_presets()
+
+        # Load saved game config (restores slider values, etc.)
+        self._load_game_config()
 
         # Build UI
         self._build_ui()
@@ -377,6 +399,14 @@ class CockpitApp:
                     self._send_punish()
                 elif self.pause_btn_rect.collidepoint(mouse_pos):
                     self.paused = not self.paused
+                elif hasattr(self, 'help_btn_rect') and self.help_btn_rect.collidepoint(mouse_pos):
+                    self.help_modal_open = True
+                elif hasattr(self, 'save_all_btn_rect') and self.save_all_btn_rect.collidepoint(mouse_pos):
+                    self._save_game()
+                    import time
+                    self.save_flash_until = time.time() + 1.5  # Flash for 1.5 seconds
+                elif hasattr(self, 'quit_btn_rect') and self.quit_btn_rect.collidepoint(mouse_pos):
+                    self.running = False
 
                 # Left panel tab clicks
                 if self.left_panel_visible:
@@ -437,7 +467,9 @@ class CockpitApp:
                 # Predators tab sliders
                 if self.left_panel_visible and self.left_panel_tab == "predators":
                     pred_keys = ["pred_patrol_radius", "pred_patrol_speed", "pred_detection_radius",
-                                 "pred_chase_speed", "pred_chase_abandon", "pred_damage", "pred_attack_cooldown"]
+                                 "pred_chase_speed", "pred_chase_abandon", "pred_damage", "pred_attack_cooldown",
+                                 "pred_initial_energy", "pred_max_energy", "pred_energy_drain",
+                                 "pred_kill_energy", "pred_repro_threshold", "pred_repro_cost"]
                     for key in pred_keys:
                         rect = getattr(self, f"slider_{key}_rect", None)
                         if rect and rect.collidepoint(mouse_pos):
@@ -465,13 +497,13 @@ class CockpitApp:
                 if hasattr(self, 'sort_dropdown_rect') and self.sort_dropdown_rect.collidepoint(mouse_pos):
                     self.sort_dropdown_open = not self.sort_dropdown_open
                     self.filter_dropdown_open = False
-                    return
+                    continue
 
                 # Filter dropdown toggle
                 if hasattr(self, 'filter_dropdown_rect') and self.filter_dropdown_rect.collidepoint(mouse_pos):
                     self.filter_dropdown_open = not self.filter_dropdown_open
                     self.sort_dropdown_open = False
-                    return
+                    continue
 
                 # Sort option selection
                 if self.sort_dropdown_open and hasattr(self, 'sort_option_rects'):
@@ -479,7 +511,7 @@ class CockpitApp:
                         if rect.collidepoint(mouse_pos):
                             self.agent_sort_key = opt
                             self.sort_dropdown_open = False
-                            return
+                            break
 
                 # Filter option selection
                 if self.filter_dropdown_open and hasattr(self, 'filter_option_rects'):
@@ -487,7 +519,7 @@ class CockpitApp:
                         if rect.collidepoint(mouse_pos):
                             self.agent_filter = opt
                             self.filter_dropdown_open = False
-                            return
+                            break
 
                 # Close dropdowns on click elsewhere
                 if self.sort_dropdown_open or self.filter_dropdown_open:
@@ -504,7 +536,7 @@ class CockpitApp:
                         else:
                             self.tracking_agent_id = wrapper.agent_id
                             print(f"Tracking agent {wrapper.agent_id}")
-                    return
+                    continue
 
                 if hasattr(self, 'heal_btn_rect') and self.heal_btn_rect.collidepoint(mouse_pos):
                     wrapper = self._get_target_agent_wrapper()
@@ -512,7 +544,7 @@ class CockpitApp:
                         wrapper.agent.energy = wrapper.agent.genome.max_energy
                         wrapper.agent.health = wrapper.agent.genome.max_health
                         print(f"Healed agent {wrapper.agent_id}")
-                    return
+                    continue
 
                 if hasattr(self, 'respawn_btn_rect') and self.respawn_btn_rect.collidepoint(mouse_pos):
                     wrapper = self._get_target_agent_wrapper()
@@ -520,32 +552,35 @@ class CockpitApp:
                         wrapper.agent.respawn()
                         self.simulation.world.add_entity(wrapper.agent)
                         print(f"Respawned agent {wrapper.agent_id}")
-                    return
+                    continue
 
                 if hasattr(self, 'save_agent_btn_rect') and self.save_agent_btn_rect.collidepoint(mouse_pos):
                     self._save_selected_agent()
-                    return
+                    continue
 
                 if hasattr(self, 'edit_genome_btn_rect') and self.edit_genome_btn_rect.collidepoint(mouse_pos):
                     self._open_genome_editor()
-                    return
+                    continue
 
                 if hasattr(self, 'load_db_btn_rect') and self.load_db_btn_rect.collidepoint(mouse_pos):
                     self._open_database_browser()
-                    return
+                    continue
 
                 # Agent table row clicks - check FIRST to prevent race condition with world click
+                clicked_table_row = False
                 if self.right_panel_visible and hasattr(self, 'agent_table_rows'):
                     for row_rect, agent_id in self.agent_table_rows:
                         if row_rect.collidepoint(mouse_pos):
                             self.selected_agent_id = agent_id
-                            return  # Early return prevents world click from also firing
+                            clicked_table_row = True
+                            break
 
                 # World click to select agent (only if we didn't click the table)
-                world_rect, _, _, _ = self._get_world_transform()
-                if world_rect.collidepoint(mouse_pos):
-                    world_x, world_y = self._screen_to_world(mouse_pos)
-                    self._select_agent_at_world_pos(world_x, world_y)
+                if not clicked_table_row:
+                    world_rect, _, _, _ = self._get_world_transform()
+                    if world_rect.collidepoint(mouse_pos):
+                        world_x, world_y = self._screen_to_world(mouse_pos)
+                        self._select_agent_at_world_pos(world_x, world_y)
 
             if event.type == pygame.MOUSEBUTTONUP:
                 self.active_slider = None
@@ -607,6 +642,12 @@ class CockpitApp:
                                 "pred_chase_abandon": "chase_abandon_distance",
                                 "pred_damage": "damage",
                                 "pred_attack_cooldown": "attack_cooldown",
+                                "pred_initial_energy": "initial_energy",
+                                "pred_max_energy": "max_energy",
+                                "pred_energy_drain": "energy_drain_rate",
+                                "pred_kill_energy": "kill_energy_gain",
+                                "pred_repro_threshold": "reproduction_threshold",
+                                "pred_repro_cost": "reproduction_cost",
                             }
                             if self.active_slider in config_map:
                                 self.predator_config[config_map[self.active_slider]] = new_val
@@ -671,14 +712,32 @@ class CockpitApp:
             scaled_dt = dt * self.time_scale
             self.simulation.tick(scaled_dt)
 
-        # Push-to-talk: SPACE unmutes microphone (only if audio enabled)
+        # Push-to-talk: SPACE key or MIC button held activates microphone
         if self.audio_enabled:
             keys = pygame.key.get_pressed()
-            if keys[pygame.K_SPACE]:
+            mouse_buttons = pygame.mouse.get_pressed()
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Check if SPACE held or MIC button held
+            mic_btn_held = (mouse_buttons[0] and
+                           hasattr(self, 'mic_btn_rect') and
+                           self.mic_btn_rect.collidepoint(mouse_pos))
+
+            should_record = keys[pygame.K_SPACE] or mic_btn_held
+
+            if should_record and not self.mic_active:
+                # Start recording when push-to-talk activated
+                self.mic_active = True
+                self.audio_capture.start()
                 self.audio_capture.unmute()
+            elif should_record and self.mic_active:
+                # Continue recording
                 self._inject_microphone_sound()
-            else:
+            elif not should_record and self.mic_active:
+                # Stop recording when push-to-talk released
+                self.mic_active = False
                 self.audio_capture.mute()
+                self.audio_capture.stop()
 
         self.ui_manager.update(dt)
 
@@ -938,21 +997,30 @@ class CockpitApp:
         pygame.draw.line(self.screen, (40, 40, 50), (x, bar_top + 8), (x, bar_top + 42))
         x += 20
 
-        # Audio visualizer placeholder
-        audio_rect = pygame.Rect(x, bar_top + 12, 100, 26)
-        pygame.draw.rect(self.screen, (37, 37, 48), audio_rect, border_radius=4)
-        mic_text = self.font_small.render("MIC", True, self.TEXT_DIM)
+        # Mic button (push-to-talk)
+        self.mic_btn_rect = pygame.Rect(x, bar_top + 8, 100, 34)
+        mic_bg_color = self.CYAN_DIM if self.mic_active else (37, 37, 48)
+        mic_border_color = self.CYAN if self.mic_active else self.TEXT_DIM
+        pygame.draw.rect(self.screen, mic_bg_color, self.mic_btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, mic_border_color, self.mic_btn_rect, 1, border_radius=4)
+        mic_label = "MIC ON" if self.mic_active else "MIC"
+        mic_text_color = self.TEXT_BRIGHT if self.mic_active else self.TEXT_DIM
+        mic_text = self.font_small.render(mic_label, True, mic_text_color)
         self.screen.blit(mic_text, (x + 8, bar_top + 16))
-        # Fake bars
-        bar_heights = [4, 8, 14, 20, 12, 6, 10, 4]
-        bar_x = x + 40
+        # Audio level bars (show real levels if active)
+        if self.mic_active and self.audio_enabled:
+            bar_heights = [4, 8, 14, 20, 12, 6, 10, 4]
+        else:
+            bar_heights = [2, 2, 2, 2, 2, 2, 2, 2]
+        bar_x = x + 50
         for h in bar_heights:
             bar_rect = pygame.Rect(bar_x, bar_top + 12 + (26 - h) // 2, 4, h)
-            pygame.draw.rect(self.screen, self.CYAN, bar_rect, border_radius=2)
+            bar_color = self.CYAN if self.mic_active else self.TEXT_DIM
+            pygame.draw.rect(self.screen, bar_color, bar_rect, border_radius=2)
             bar_x += 6
 
-        # Right side buttons
-        x = self.window_width - 260
+        # Right side buttons (need ~350px for all buttons)
+        x = self.window_width - 350
 
         # Pause button
         self.pause_btn_rect = pygame.Rect(x, bar_top + 8, 70, 34)
@@ -973,11 +1041,40 @@ class CockpitApp:
         x += 68
 
         # Help button
-        help_rect = pygame.Rect(x, bar_top + 8, 50, 34)
-        pygame.draw.rect(self.screen, (37, 37, 48), help_rect, border_radius=4)
-        pygame.draw.rect(self.screen, self.TEXT_DIM, help_rect, 1, border_radius=4)
+        self.help_btn_rect = pygame.Rect(x, bar_top + 8, 50, 34)
+        pygame.draw.rect(self.screen, (37, 37, 48), self.help_btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.TEXT_DIM, self.help_btn_rect, 1, border_radius=4)
         help_text = self.font_small.render("?", True, self.TEXT_NORMAL)
         self.screen.blit(help_text, (x + 20, bar_top + 14))
+        x += 58
+
+        # Save All button (flashes green on success)
+        self.save_all_btn_rect = pygame.Rect(x, bar_top + 8, 70, 34)
+        import time
+        save_flashing = time.time() < self.save_flash_until
+        if save_flashing:
+            # Green flash for success
+            pygame.draw.rect(self.screen, (0, 100, 60), self.save_all_btn_rect, border_radius=4)
+            pygame.draw.rect(self.screen, self.GREEN, self.save_all_btn_rect, 2, border_radius=4)
+            save_label = "Saved!"
+            save_text_color = self.TEXT_BRIGHT
+        else:
+            pygame.draw.rect(self.screen, (37, 37, 48), self.save_all_btn_rect, border_radius=4)
+            pygame.draw.rect(self.screen, self.CYAN_DIM, self.save_all_btn_rect, 1, border_radius=4)
+            save_label = "Save"
+            save_text_color = self.TEXT_NORMAL
+        save_text = self.font_small.render(save_label, True, save_text_color)
+        text_x = self.save_all_btn_rect.centerx - save_text.get_width() // 2
+        self.screen.blit(save_text, (text_x, bar_top + 14))
+        x += 78
+
+        # Quit button
+        self.quit_btn_rect = pygame.Rect(x, bar_top + 8, 50, 34)
+        pygame.draw.rect(self.screen, (37, 37, 48), self.quit_btn_rect, border_radius=4)
+        pygame.draw.rect(self.screen, self.RED, self.quit_btn_rect, 1, border_radius=4)
+        quit_text = self.font_small.render("Quit", True, self.TEXT_NORMAL)
+        text_x = self.quit_btn_rect.centerx - quit_text.get_width() // 2
+        self.screen.blit(quit_text, (text_x, bar_top + 14))
 
     def _render_left_panel(self) -> None:
         """Render left control panel."""
@@ -1274,6 +1371,34 @@ class CockpitApp:
                                      self.predator_config["damage"], 5, 50, "pred_damage", 20.0)
             y += self._render_slider(x, y, width, "Attack Cooldown",
                                      self.predator_config["attack_cooldown"], 0.5, 3.0, "pred_attack_cooldown", 1.0)
+            y += 8
+
+            # ENERGY section
+            section = self.font_small.render("ENERGY", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Initial Energy",
+                                     self.predator_config["initial_energy"], 20, 150, "pred_initial_energy", 80.0)
+            y += self._render_slider(x, y, width, "Max Energy",
+                                     self.predator_config["max_energy"], 100, 400, "pred_max_energy", 200.0)
+            y += self._render_slider(x, y, width, "Energy Drain/s",
+                                     self.predator_config["energy_drain_rate"], 0.1, 5.0, "pred_energy_drain", 1.0)
+            y += self._render_slider(x, y, width, "Kill Energy Gain",
+                                     self.predator_config["kill_energy_gain"], 20, 150, "pred_kill_energy", 80.0)
+            y += 8
+
+            # BREEDING section
+            section = self.font_small.render("BREEDING", True, self.TEXT_DIM)
+            self.screen.blit(section, (x, y))
+            pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+            y += 24
+
+            y += self._render_slider(x, y, width, "Repro Threshold",
+                                     self.predator_config["reproduction_threshold"], 50, 300, "pred_repro_threshold", 150.0)
+            y += self._render_slider(x, y, width, "Repro Cost",
+                                     self.predator_config["reproduction_cost"], 20, 150, "pred_repro_cost", 70.0)
 
             # Apply to existing button
             y += 16
@@ -1413,8 +1538,8 @@ class CockpitApp:
         y += 22
 
         # Column headers
-        cols = ["#", "E", "H", "Age", "Gen", "Fd", "Ch"]
-        col_widths = [24, 36, 36, 48, 36, 36, 36]
+        cols = ["#", "E", "H", "Age", "Tot", "Gn", "Fd", "Ch"]
+        col_widths = [22, 32, 32, 40, 40, 28, 28, 28]
         col_x = x
 
         pygame.draw.rect(self.screen, self.BG_DARK, pygame.Rect(x, y, width, 20))
@@ -1430,12 +1555,17 @@ class CockpitApp:
         agents_data = []
         for agent_id, wrapper in self.simulation.agents.items():
             agent = wrapper.agent
+            # Calculate total time (cumulative + current run if alive)
+            total_time = wrapper.lifetime_stats.get('total_time_alive', 0)
+            if agent.is_alive:
+                total_time += agent.age
             agents_data.append({
                 'id': agent_id,
                 'alive': agent.is_alive,
                 'energy': agent.energy / agent.genome.max_energy if agent.is_alive else 0,
                 'health': agent.health / agent.genome.max_health if agent.is_alive else 0,
                 'age': agent.age,
+                'total_time': total_time,
                 'generation': wrapper.generation,
                 'food': wrapper.lifetime_stats.get('total_food_eaten', 0),
                 'offspring': wrapper.lifetime_stats.get('offspring_count', 0),
@@ -1444,6 +1574,7 @@ class CockpitApp:
         # Sort based on current sort key
         sort_funcs = {
             "age": lambda a: (-int(a['alive']), -a['age']),
+            "total": lambda a: (-int(a['alive']), -a['total_time']),
             "energy": lambda a: (-int(a['alive']), -a['energy']),
             "health": lambda a: (-int(a['alive']), -a['health']),
             "gen": lambda a: (-int(a['alive']), -a['generation']),
@@ -1497,7 +1628,7 @@ class CockpitApp:
             self.screen.blit(health, (col_x + 2, y + 2))
             col_x += col_widths[2]
 
-            # Age
+            # Age (current run)
             if agent['alive']:
                 age_text = f"{int(agent['age'])}s"
             else:
@@ -1506,15 +1637,28 @@ class CockpitApp:
             self.screen.blit(age, (col_x + 2, y + 2))
             col_x += col_widths[3]
 
+            # Total Time (cumulative)
+            total_t = agent['total_time']
+            if total_t >= 3600:
+                tot_text = f"{total_t/3600:.1f}h"
+            elif total_t >= 60:
+                tot_text = f"{int(total_t/60)}m"
+            else:
+                tot_text = f"{int(total_t)}s"
+            tot_color = self.CYAN if agent['alive'] else self.TEXT_DIM
+            tot = self.font_small.render(tot_text, True, tot_color)
+            self.screen.blit(tot, (col_x + 2, y + 2))
+            col_x += col_widths[4]
+
             # Generation
             gen = self.font_small.render(str(agent['generation']), True, text_color)
             self.screen.blit(gen, (col_x + 2, y + 2))
-            col_x += col_widths[4]
+            col_x += col_widths[5]
 
             # Food
             food = self.font_small.render(str(agent['food']), True, text_color)
             self.screen.blit(food, (col_x + 2, y + 2))
-            col_x += col_widths[5]
+            col_x += col_widths[6]
 
             # Offspring
             offspring = self.font_small.render(str(agent['offspring']), True, text_color)
@@ -1524,7 +1668,7 @@ class CockpitApp:
 
         # Render dropdown menus (on top of table)
         if self.sort_dropdown_open:
-            sort_options = ["age", "energy", "health", "gen", "food"]
+            sort_options = ["age", "total", "energy", "health", "gen", "food"]
             menu_y = self.sort_dropdown_rect.bottom + 2
             self.sort_option_rects = []
             for opt in sort_options:
@@ -1947,11 +2091,122 @@ class CockpitApp:
 
         print(f"Loaded map from {map_files[0].name}")
 
+    def _load_sim_config_early(self) -> None:
+        """Load sim_config values from saved config BEFORE simulation is created.
+
+        This is called early in __init__ to ensure max_agents, predator_count, etc.
+        are set correctly before the Simulation spawns entities.
+        """
+        config_file = self.user_data_dir / "game_config.json"
+        if not config_file.exists():
+            return
+
+        try:
+            with open(config_file) as f:
+                config_data = json.load(f)
+        except Exception as e:
+            print(f"Error loading early config: {e}")
+            return
+
+        # Apply sim_config values that affect initial spawn counts
+        if 'control_values' in config_data:
+            sim_config_keys = ['max_agents', 'predator_count', 'initial_food', 'max_food', 'tick_rate',
+                               'lrn_hidden_dim', 'lrn_num_mixing_layers', 'learning_rate', 'reward_modulation_scale']
+            for key in sim_config_keys:
+                if key in config_data['control_values'] and hasattr(self.sim_config, key):
+                    setattr(self.sim_config, key, config_data['control_values'][key])
+
+        print(f"Loaded sim config (max_agents={self.sim_config.max_agents})")
+
+    def _save_game(self) -> None:
+        """Save complete game state: agents, map, and config."""
+        # Save agents
+        self._auto_save_agents()
+
+        # Save map
+        self._save_map()
+
+        # Save config values
+        config_data = {
+            'timestamp': datetime.now().isoformat(),
+            'control_values': self.control_values.copy(),
+            'reward_values': self.reward_values.copy(),
+            'predator_config': self.predator_config.copy(),
+            'default_genome': {
+                'max_speed': self.default_genome.max_speed,
+                'max_angular_speed': self.default_genome.max_angular_speed,
+                'thrust_force': self.default_genome.thrust_force,
+                'radius': self.default_genome.radius,
+                'vision_range': self.default_genome.vision_range,
+                'vision_fov': self.default_genome.vision_fov,
+                'audio_range': self.default_genome.audio_range,
+                'base_energy_cost': self.default_genome.base_energy_cost,
+                'movement_energy_mult': self.default_genome.movement_energy_mult,
+                'eating_efficiency': self.default_genome.eating_efficiency,
+            },
+        }
+
+        config_file = self.user_data_dir / "game_config.json"
+        try:
+            with open(config_file, 'w') as f:
+                json.dump(config_data, f, indent=2)
+            print(f"Game saved! (agents, map, config)")
+        except Exception as e:
+            print(f"Error saving config: {e}")
+
+    def _load_game_config(self) -> None:
+        """Load saved config values on startup."""
+        config_file = self.user_data_dir / "game_config.json"
+        if not config_file.exists():
+            return
+
+        try:
+            with open(config_file) as f:
+                config_data = json.load(f)
+        except Exception as e:
+            print(f"Error loading config: {e}")
+            return
+
+        # Restore control values
+        if 'control_values' in config_data:
+            for key, val in config_data['control_values'].items():
+                if key in self.control_values:
+                    self.control_values[key] = val
+                    # Also apply to sim_config
+                    if hasattr(self.sim_config, key):
+                        setattr(self.sim_config, key, val)
+
+        # Restore reward values
+        if 'reward_values' in config_data:
+            for key, val in config_data['reward_values'].items():
+                if key in self.reward_values:
+                    self.reward_values[key] = val
+                    # Also apply to SurvivalRewards class
+                    attr_name = key.upper()
+                    if hasattr(SurvivalRewards, attr_name):
+                        setattr(SurvivalRewards, attr_name, val)
+
+        # Restore predator config
+        if 'predator_config' in config_data:
+            for key, val in config_data['predator_config'].items():
+                if key in self.predator_config:
+                    self.predator_config[key] = val
+
+        # Restore default genome
+        if 'default_genome' in config_data:
+            genome_data = config_data['default_genome']
+            for key, val in genome_data.items():
+                if hasattr(self.default_genome, key):
+                    setattr(self.default_genome, key, val)
+
+        print("Loaded saved config")
+
     def _apply_predator_config(self) -> None:
         """Apply current predator config to all active predators."""
         count = 0
         for predator in self.simulation.world.predators:
             if predator.is_active:
+                # Behavior settings
                 predator.patrol_radius = self.predator_config["patrol_radius"]
                 predator.detection_radius = self.predator_config["detection_radius"]
                 predator.chase_speed = self.predator_config["chase_speed"]
@@ -1959,6 +2214,13 @@ class CockpitApp:
                 predator.damage = self.predator_config["damage"]
                 predator.attack_cooldown_max = self.predator_config["attack_cooldown"]
                 predator.chase_abandon_distance = self.predator_config["chase_abandon_distance"]
+                # Energy settings
+                predator.max_energy = self.predator_config["max_energy"]
+                predator.energy_drain_rate = self.predator_config["energy_drain_rate"]
+                predator.kill_energy_gain = self.predator_config["kill_energy_gain"]
+                # Breeding settings
+                predator.reproduction_threshold = self.predator_config["reproduction_threshold"]
+                predator.reproduction_cost = self.predator_config["reproduction_cost"]
                 count += 1
         print(f"Applied predator config to {count} predators")
 
@@ -2330,8 +2592,8 @@ class CockpitApp:
 
         # Column headers
         col_x = modal_x + 15
-        col_widths = [30, 200, 50, 60, 60, 80]  # Star, Name, Gen, Life, Food, Saved
-        col_labels = ["", "Name", "Gen", "Life", "Food", "Saved"]
+        col_widths = [25, 160, 40, 55, 55, 45, 70]  # Star, Name, Gen, Best, Total, Food, Saved
+        col_labels = ["", "Name", "Gen", "Best", "Total", "Food", "Saved"]
 
         header_y = list_y
         pygame.draw.rect(self.screen, self.BG_DARK, pygame.Rect(modal_x + 10, header_y, modal_w - 20, 20))
@@ -2380,19 +2642,31 @@ class CockpitApp:
             gen_text = self.font_small.render(str(agent.generation), True, self.TEXT_NORMAL)
             self.screen.blit(gen_text, (gen_x, row_y + 8))
 
-            # Longest Life
-            life_x = gen_x + col_widths[2]
-            life_str = f"{int(agent.longest_life)}s"
-            life_text = self.font_small.render(life_str, True, self.TEXT_NORMAL)
-            self.screen.blit(life_text, (life_x, row_y + 8))
+            # Best Life (longest single run)
+            best_x = gen_x + col_widths[2]
+            best_str = f"{int(agent.longest_life)}s"
+            best_text = self.font_small.render(best_str, True, self.TEXT_NORMAL)
+            self.screen.blit(best_text, (best_x, row_y + 8))
+
+            # Total Time (cumulative across all lives)
+            total_x = best_x + col_widths[3]
+            total_time = agent.total_time_alive
+            if total_time >= 3600:
+                total_str = f"{total_time/3600:.1f}h"
+            elif total_time >= 60:
+                total_str = f"{int(total_time/60)}m"
+            else:
+                total_str = f"{int(total_time)}s"
+            total_text = self.font_small.render(total_str, True, self.CYAN)
+            self.screen.blit(total_text, (total_x, row_y + 8))
 
             # Food Eaten
-            food_x = life_x + col_widths[3]
+            food_x = total_x + col_widths[4]
             food_text = self.font_small.render(str(agent.total_food_eaten), True, self.TEXT_NORMAL)
             self.screen.blit(food_text, (food_x, row_y + 8))
 
             # Saved Date
-            saved_x = food_x + col_widths[4]
+            saved_x = food_x + col_widths[5]
             saved_date = datetime.fromtimestamp(agent.saved_at)
             date_str = saved_date.strftime("%m/%d/%y")
             saved_text = self.font_small.render(date_str, True, self.TEXT_DIM)
@@ -2745,8 +3019,7 @@ class CockpitApp:
         self.running = True
         self._auto_load_agents()  # Load on start
 
-        if self.audio_enabled:
-            self.audio_capture.start()
+        # Note: audio_capture.start() is NOT called here - mic only activates on push-to-talk
 
         while self.running:
             dt = self.clock.tick(60) / 1000.0

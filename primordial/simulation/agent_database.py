@@ -119,8 +119,14 @@ class AgentDatabase:
         # Serialize genome
         genome_json = json.dumps(wrapper.agent.genome.to_dict())
 
-        # Get stats
-        stats = wrapper.lifetime_stats
+        # Get stats - include current run's time if agent is alive
+        stats = wrapper.lifetime_stats.copy()
+        if wrapper.agent.is_alive:
+            # Add current run's time to cumulative total
+            stats['total_time_alive'] = stats['total_time_alive'] + wrapper.agent.age
+            # Update longest_life if current run is longer
+            if wrapper.agent.age > stats['longest_life']:
+                stats['longest_life'] = wrapper.agent.age
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

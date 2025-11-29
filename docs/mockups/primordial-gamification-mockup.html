@@ -1,0 +1,2727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Primordial - Gamification Mockups</title>
+    <style>
+        /* ============================================
+           CSS VARIABLES - Sci-Fi/Neon Theme
+           (Same as main mockup for consistency)
+           ============================================ */
+        :root {
+            /* Background colors */
+            --bg-darkest: #0a0a12;
+            --bg-dark: #12121a;
+            --bg-panel: #1a1a24;
+            --bg-input: #252530;
+            --bg-hover: #2a2a38;
+
+            /* Accent colors */
+            --cyan: #00ffff;
+            --cyan-dim: #00aaaa;
+            --cyan-glow: rgba(0, 255, 255, 0.3);
+            --green: #00ff88;
+            --green-dim: #00aa66;
+            --red: #ff4466;
+            --red-dim: #aa3344;
+            --yellow: #ffdd44;
+            --yellow-dim: #aa9922;
+            --purple: #aa66ff;
+            --pink: #ff66aa;
+            --orange: #ff8844;
+            --gold: #ffd700;
+            --silver: #c0c0c0;
+            --bronze: #cd7f32;
+
+            /* Text colors */
+            --text-bright: #ffffff;
+            --text-normal: #ccccdd;
+            --text-dim: #888899;
+            --text-disabled: #555566;
+
+            /* Sizing */
+            --panel-width: 280px;
+            --topbar-height: 50px;
+            --border-radius: 6px;
+
+            /* Fonts */
+            --font-main: 'Segoe UI', 'Roboto', sans-serif;
+            --font-mono: 'Consolas', 'Monaco', monospace;
+        }
+
+        /* ============================================
+           RESET & BASE
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-main);
+            font-size: 14px;
+            color: var(--text-normal);
+            background: var(--bg-darkest);
+            min-height: 100vh;
+        }
+
+        /* ============================================
+           NAVIGATION BETWEEN MOCKUPS
+           ============================================ */
+        .mockup-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-dark);
+            border-bottom: 2px solid var(--cyan);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            z-index: 1000;
+        }
+
+        .mockup-nav-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .mockup-nav-divider {
+            width: 1px;
+            height: 24px;
+            background: var(--bg-hover);
+        }
+
+        .mockup-nav-tabs {
+            display: flex;
+            gap: 8px;
+        }
+
+        .mockup-nav-tab {
+            padding: 8px 16px;
+            background: var(--bg-input);
+            border: 1px solid transparent;
+            border-radius: var(--border-radius);
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .mockup-nav-tab:hover {
+            background: var(--bg-hover);
+            color: var(--text-normal);
+        }
+
+        .mockup-nav-tab.active {
+            background: var(--cyan-dim);
+            border-color: var(--cyan);
+            color: var(--bg-darkest);
+            font-weight: bold;
+        }
+
+        .mockup-container {
+            padding-top: 74px;
+        }
+
+        .mockup-section {
+            display: none;
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .mockup-section.active {
+            display: block;
+        }
+
+        .mockup-section-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--cyan);
+            margin-bottom: 8px;
+        }
+
+        .mockup-section-subtitle {
+            color: var(--text-dim);
+            margin-bottom: 24px;
+            font-size: 15px;
+        }
+
+        /* ============================================
+           COMMON COMPONENTS
+           ============================================ */
+        .card {
+            background: var(--bg-panel);
+            border: 1px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: var(--bg-dark);
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--bg-hover);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--cyan-dim);
+            border: 2px solid var(--cyan);
+            color: var(--bg-darkest);
+        }
+
+        .btn-primary:hover {
+            background: var(--cyan);
+            box-shadow: 0 0 20px var(--cyan-glow);
+        }
+
+        .btn-secondary {
+            background: var(--bg-input);
+            border: 1px solid var(--text-dim);
+            color: var(--text-normal);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .btn-success {
+            background: var(--green-dim);
+            border: 2px solid var(--green);
+            color: var(--bg-darkest);
+        }
+
+        .btn-success:hover {
+            background: var(--green);
+        }
+
+        .btn-danger {
+            background: var(--red-dim);
+            border: 2px solid var(--red);
+            color: var(--bg-darkest);
+        }
+
+        .btn-danger:hover {
+            background: var(--red);
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .badge-gold { background: var(--gold); color: #000; }
+        .badge-silver { background: var(--silver); color: #000; }
+        .badge-bronze { background: var(--bronze); color: #fff; }
+        .badge-cyan { background: var(--cyan-dim); color: var(--bg-darkest); }
+        .badge-green { background: var(--green-dim); color: var(--bg-darkest); }
+        .badge-red { background: var(--red-dim); color: var(--text-bright); }
+
+        .stat-value {
+            font-family: var(--font-mono);
+            color: var(--cyan);
+            font-weight: bold;
+        }
+
+        /* ============================================
+           SECTION 1: CHALLENGE MODE
+           ============================================ */
+        .challenge-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .level-card {
+            background: var(--bg-panel);
+            border: 2px solid var(--bg-hover);
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .level-card:hover {
+            border-color: var(--cyan);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px rgba(0, 255, 255, 0.2);
+        }
+
+        .level-card.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .level-card.locked:hover {
+            transform: none;
+            border-color: var(--bg-hover);
+            box-shadow: none;
+        }
+
+        .level-card.completed {
+            border-color: var(--green-dim);
+        }
+
+        .level-preview {
+            height: 140px;
+            background:
+                linear-gradient(rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+                var(--bg-darkest);
+            background-size: 20px 20px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .level-preview-content {
+            text-align: center;
+            color: var(--text-dim);
+        }
+
+        .level-preview .start-zone {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 60px;
+            background: rgba(0, 255, 136, 0.3);
+            border: 2px solid var(--green);
+            border-radius: 4px;
+        }
+
+        .level-preview .end-zone {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 60px;
+            background: rgba(0, 255, 255, 0.3);
+            border: 2px solid var(--cyan);
+            border-radius: 4px;
+        }
+
+        .level-preview .obstacle {
+            position: absolute;
+            background: var(--red);
+            border-radius: 50%;
+            opacity: 0.7;
+        }
+
+        .level-info {
+            padding: 16px;
+        }
+
+        .level-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .level-number {
+            font-size: 12px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        .level-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--text-bright);
+            margin-bottom: 4px;
+        }
+
+        .level-difficulty {
+            display: flex;
+            gap: 3px;
+        }
+
+        .difficulty-star {
+            color: var(--yellow);
+            font-size: 14px;
+        }
+
+        .difficulty-star.empty {
+            color: var(--text-disabled);
+        }
+
+        .level-description {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .level-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+        }
+
+        .level-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .level-stat-icon {
+            font-size: 14px;
+        }
+
+        .level-best-time {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            color: var(--gold);
+            border: 1px solid var(--gold);
+        }
+
+        .level-lock-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+        }
+
+        .level-stars-earned {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+        }
+
+        .star-earned {
+            font-size: 20px;
+            color: var(--gold);
+        }
+
+        .star-earned.empty {
+            color: var(--text-disabled);
+        }
+
+        /* Challenge Active View */
+        .challenge-active-container {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 24px;
+        }
+
+        .challenge-world {
+            background: var(--bg-panel);
+            border: 2px solid var(--cyan);
+            border-radius: 12px;
+            height: 500px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .challenge-world-grid {
+            width: 100%;
+            height: 100%;
+            background:
+                linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+                var(--bg-darkest);
+            background-size: 40px 40px;
+        }
+
+        .challenge-hud {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .challenge-timer {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: 2px solid var(--cyan);
+            font-family: var(--font-mono);
+            font-size: 32px;
+            color: var(--cyan);
+        }
+
+        .challenge-progress {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: 1px solid var(--bg-hover);
+        }
+
+        .checkpoint-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .checkpoint-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid var(--text-dim);
+            background: transparent;
+        }
+
+        .checkpoint-dot.reached {
+            background: var(--green);
+            border-color: var(--green);
+        }
+
+        .checkpoint-dot.current {
+            border-color: var(--cyan);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 var(--cyan-glow); }
+            50% { box-shadow: 0 0 0 8px transparent; }
+        }
+
+        .challenge-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .agent-select-card .agent-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-input);
+            border: 2px solid transparent;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .agent-option:hover {
+            border-color: var(--cyan-dim);
+        }
+
+        .agent-option.selected {
+            border-color: var(--cyan);
+            background: var(--bg-hover);
+        }
+
+        .agent-option-avatar {
+            width: 40px;
+            height: 40px;
+            background: var(--cyan);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .agent-option-info {
+            flex: 1;
+        }
+
+        .agent-option-name {
+            font-weight: bold;
+            color: var(--text-bright);
+            margin-bottom: 2px;
+        }
+
+        .agent-option-stats {
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .objectives-list {
+            list-style: none;
+        }
+
+        .objective-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .objective-item:last-child {
+            border-bottom: none;
+        }
+
+        .objective-check {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--text-dim);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .objective-check.completed {
+            background: var(--green);
+            border-color: var(--green);
+            color: var(--bg-darkest);
+        }
+
+        .objective-text {
+            flex: 1;
+            font-size: 13px;
+        }
+
+        .objective-reward {
+            font-size: 12px;
+            color: var(--yellow);
+        }
+
+        /* ============================================
+           SECTION 2: LEADERBOARDS
+           ============================================ */
+        .leaderboard-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }
+
+        .leaderboard-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .leaderboard-tab {
+            padding: 10px 20px;
+            background: var(--bg-input);
+            border: 1px solid transparent;
+            border-radius: var(--border-radius);
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .leaderboard-tab:hover {
+            background: var(--bg-hover);
+            color: var(--text-normal);
+        }
+
+        .leaderboard-tab.active {
+            background: var(--bg-hover);
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .leaderboard-table th {
+            background: var(--bg-dark);
+            padding: 14px 12px;
+            text-align: left;
+            font-weight: bold;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-size: 11px;
+            border-bottom: 2px solid var(--cyan-dim);
+        }
+
+        .leaderboard-table td {
+            padding: 14px 12px;
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .leaderboard-table tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .leaderboard-table tr.highlight {
+            background: rgba(0, 255, 255, 0.1);
+        }
+
+        .rank-cell {
+            font-family: var(--font-mono);
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .rank-1 { color: var(--gold); }
+        .rank-2 { color: var(--silver); }
+        .rank-3 { color: var(--bronze); }
+
+        .player-cell {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .player-avatar {
+            width: 36px;
+            height: 36px;
+            background: var(--purple);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--text-bright);
+        }
+
+        .player-name {
+            font-weight: bold;
+            color: var(--text-bright);
+        }
+
+        .player-tag {
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .score-cell {
+            font-family: var(--font-mono);
+            font-size: 16px;
+            color: var(--cyan);
+            font-weight: bold;
+        }
+
+        .your-stats-card .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .your-stats-card .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: var(--text-dim);
+        }
+
+        .trend-up {
+            color: var(--green);
+        }
+
+        .trend-down {
+            color: var(--red);
+        }
+
+        /* ============================================
+           SECTION 3: MULTIPLAYER ARENA
+           ============================================ */
+        .arena-modes {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .arena-mode-card {
+            background: var(--bg-panel);
+            border: 2px solid var(--bg-hover);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .arena-mode-card:hover {
+            border-color: var(--cyan);
+            transform: translateY(-4px);
+        }
+
+        .arena-mode-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .arena-mode-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--text-bright);
+            margin-bottom: 8px;
+        }
+
+        .arena-mode-desc {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .arena-mode-players {
+            font-size: 12px;
+            color: var(--cyan);
+        }
+
+        /* Match Lobby */
+        .match-lobby {
+            display: grid;
+            grid-template-columns: 1fr 400px 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .team-panel {
+            background: var(--bg-panel);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .team-header {
+            padding: 16px 20px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .team-header.team-blue {
+            background: rgba(0, 100, 255, 0.3);
+            color: #66aaff;
+            border-bottom: 2px solid #4488ff;
+        }
+
+        .team-header.team-red {
+            background: rgba(255, 68, 102, 0.3);
+            color: #ff6688;
+            border-bottom: 2px solid var(--red);
+        }
+
+        .team-slots {
+            padding: 16px;
+        }
+
+        .team-slot {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-input);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .team-slot.empty {
+            border: 2px dashed var(--text-disabled);
+            background: transparent;
+            justify-content: center;
+            color: var(--text-disabled);
+        }
+
+        .slot-avatar {
+            width: 44px;
+            height: 44px;
+            background: var(--cyan);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .slot-info {
+            flex: 1;
+        }
+
+        .slot-name {
+            font-weight: bold;
+            color: var(--text-bright);
+        }
+
+        .slot-rating {
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .slot-ready {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid var(--text-dim);
+        }
+
+        .slot-ready.is-ready {
+            background: var(--green);
+            border-color: var(--green);
+        }
+
+        .arena-preview {
+            background: var(--bg-panel);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .arena-preview-header {
+            background: var(--bg-dark);
+            padding: 12px 16px;
+            text-align: center;
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .arena-preview-map {
+            height: 300px;
+            background:
+                linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+                var(--bg-darkest);
+            background-size: 30px 30px;
+            position: relative;
+        }
+
+        .arena-preview-footer {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .match-settings {
+            display: flex;
+            justify-content: space-around;
+            font-size: 12px;
+        }
+
+        .match-setting {
+            text-align: center;
+        }
+
+        .match-setting-label {
+            color: var(--text-dim);
+            margin-bottom: 4px;
+        }
+
+        .match-setting-value {
+            color: var(--text-bright);
+            font-weight: bold;
+        }
+
+        /* ============================================
+           SECTION 4: AGENT PROFILE
+           ============================================ */
+        .profile-header {
+            display: flex;
+            gap: 32px;
+            margin-bottom: 32px;
+            padding: 24px;
+            background: var(--bg-panel);
+            border-radius: 12px;
+            border: 1px solid var(--bg-hover);
+        }
+
+        .profile-avatar-large {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, var(--cyan), var(--purple));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            border: 4px solid var(--cyan);
+            box-shadow: 0 0 30px var(--cyan-glow);
+        }
+
+        .profile-info {
+            flex: 1;
+        }
+
+        .profile-name {
+            font-size: 32px;
+            font-weight: bold;
+            color: var(--text-bright);
+            margin-bottom: 4px;
+        }
+
+        .profile-title {
+            font-size: 14px;
+            color: var(--purple);
+            margin-bottom: 16px;
+        }
+
+        .profile-badges {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .profile-quick-stats {
+            display: flex;
+            gap: 32px;
+        }
+
+        .quick-stat {
+            text-align: center;
+        }
+
+        .quick-stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            font-family: var(--font-mono);
+            color: var(--cyan);
+        }
+
+        .quick-stat-label {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        .profile-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .profile-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }
+
+        .performance-chart {
+            height: 200px;
+            background: var(--bg-input);
+            border-radius: 8px;
+            display: flex;
+            align-items: flex-end;
+            padding: 16px;
+            gap: 8px;
+        }
+
+        .chart-bar {
+            flex: 1;
+            background: linear-gradient(to top, var(--cyan-dim), var(--cyan));
+            border-radius: 4px 4px 0 0;
+            min-height: 20px;
+            position: relative;
+        }
+
+        .chart-bar::after {
+            content: attr(data-value);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-bottom: 4px;
+        }
+
+        .achievements-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .achievement {
+            background: var(--bg-input);
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid var(--bg-hover);
+        }
+
+        .achievement.unlocked {
+            border-color: var(--gold);
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .achievement-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+            filter: grayscale(100%);
+            opacity: 0.3;
+        }
+
+        .achievement.unlocked .achievement-icon {
+            filter: none;
+            opacity: 1;
+        }
+
+        .achievement-name {
+            font-size: 11px;
+            font-weight: bold;
+            color: var(--text-dim);
+        }
+
+        .achievement.unlocked .achievement-name {
+            color: var(--gold);
+        }
+
+        .lineage-tree {
+            padding: 20px;
+        }
+
+        .lineage-node {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-input);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            margin-left: 0;
+        }
+
+        .lineage-node.child {
+            margin-left: 32px;
+            border-left: 2px solid var(--cyan-dim);
+        }
+
+        .lineage-node.child::before {
+            content: "";
+            position: absolute;
+            left: -18px;
+            top: 50%;
+            width: 16px;
+            height: 2px;
+            background: var(--cyan-dim);
+        }
+
+        .lineage-avatar {
+            width: 32px;
+            height: 32px;
+            background: var(--purple);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .lineage-info {
+            flex: 1;
+        }
+
+        .lineage-name {
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .lineage-stats {
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        /* ============================================
+           SECTION 5: SCORING BREAKDOWN
+           ============================================ */
+        .scoring-formula {
+            background: var(--bg-input);
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .formula-text {
+            font-family: var(--font-mono);
+            font-size: 18px;
+            color: var(--cyan);
+            margin-bottom: 12px;
+        }
+
+        .formula-explanation {
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        .score-breakdown {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .score-component {
+            background: var(--bg-panel);
+            border: 1px solid var(--bg-hover);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .score-component-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .score-component-name {
+            font-size: 12px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .score-component-value {
+            font-size: 28px;
+            font-weight: bold;
+            font-family: var(--font-mono);
+            color: var(--cyan);
+            margin-bottom: 4px;
+        }
+
+        .score-component-weight {
+            font-size: 11px;
+            color: var(--text-disabled);
+        }
+
+        /* ============================================
+           RESPONSIVE STYLES
+           ============================================ */
+        @media (max-width: 1200px) {
+            .leaderboard-container,
+            .profile-content {
+                grid-template-columns: 1fr;
+            }
+
+            .match-lobby {
+                grid-template-columns: 1fr;
+            }
+
+            .arena-modes {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .challenge-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .mockup-nav {
+                flex-wrap: wrap;
+                padding: 8px 16px;
+            }
+
+            .mockup-nav-tabs {
+                flex-wrap: wrap;
+            }
+
+            .profile-header {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+
+            .profile-quick-stats {
+                justify-content: center;
+            }
+        }
+
+        /* ============================================
+           SCROLLBAR
+           ============================================ */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-hover);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--cyan-dim);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="mockup-nav">
+        <span class="mockup-nav-title">PRIMORDIAL</span>
+        <div class="mockup-nav-divider"></div>
+        <div class="mockup-nav-tabs">
+            <button class="mockup-nav-tab active" onclick="showSection('challenges')">Challenge Mode</button>
+            <button class="mockup-nav-tab" onclick="showSection('leaderboards')">Leaderboards</button>
+            <button class="mockup-nav-tab" onclick="showSection('arena')">Multiplayer Arena</button>
+            <button class="mockup-nav-tab" onclick="showSection('profile')">Agent Profile</button>
+            <button class="mockup-nav-tab" onclick="showSection('scoring')">Scoring System</button>
+            <button class="mockup-nav-tab" onclick="showSection('progression')">Progression</button>
+        </div>
+    </nav>
+
+    <div class="mockup-container">
+        <!-- ============================================
+             SECTION 1: CHALLENGE MODE
+             ============================================ -->
+        <section id="challenges" class="mockup-section active">
+            <h1 class="mockup-section-title">Challenge Mode</h1>
+            <p class="mockup-section-subtitle">Navigate your agents through increasingly difficult levels. Earn stars and unlock new challenges!</p>
+
+            <!-- Level Selection Grid -->
+            <div class="challenge-grid">
+                <!-- Level 1 - Completed -->
+                <div class="level-card completed">
+                    <div class="level-preview">
+                        <div class="start-zone"></div>
+                        <div class="end-zone"></div>
+                        <div class="obstacle" style="left: 40%; top: 30%; width: 20px; height: 20px;"></div>
+                    </div>
+                    <div class="level-best-time">00:23.4</div>
+                    <div class="level-info">
+                        <div class="level-header">
+                            <div>
+                                <div class="level-number">Level 1</div>
+                                <div class="level-name">First Steps</div>
+                            </div>
+                            <div class="level-difficulty">
+                                <span class="difficulty-star">★</span>
+                                <span class="difficulty-star empty">★</span>
+                                <span class="difficulty-star empty">★</span>
+                            </div>
+                        </div>
+                        <div class="level-description">Learn the basics. Navigate from start to finish with minimal obstacles.</div>
+                        <div class="level-stats">
+                            <div class="level-stat">
+                                <span class="level-stat-icon">🎯</span>
+                                <span>3 checkpoints</span>
+                            </div>
+                            <div class="level-stat">
+                                <span class="level-stat-icon">⏱️</span>
+                                <span>Par: 30s</span>
+                            </div>
+                        </div>
+                        <div class="level-stars-earned">
+                            <span class="star-earned">★</span>
+                            <span class="star-earned">★</span>
+                            <span class="star-earned">★</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Level 2 - Completed -->
+                <div class="level-card completed">
+                    <div class="level-preview">
+                        <div class="start-zone"></div>
+                        <div class="end-zone"></div>
+                        <div class="obstacle" style="left: 30%; top: 40%; width: 25px; height: 25px;"></div>
+                        <div class="obstacle" style="left: 55%; top: 60%; width: 20px; height: 20px;"></div>
+                    </div>
+                    <div class="level-best-time">00:41.2</div>
+                    <div class="level-info">
+                        <div class="level-header">
+                            <div>
+                                <div class="level-number">Level 2</div>
+                                <div class="level-name">Predator Alley</div>
+                            </div>
+                            <div class="level-difficulty">
+                                <span class="difficulty-star">★</span>
+                                <span class="difficulty-star">★</span>
+                                <span class="difficulty-star empty">★</span>
+                            </div>
+                        </div>
+                        <div class="level-description">Two predators patrol the path. Time your movements carefully.</div>
+                        <div class="level-stats">
+                            <div class="level-stat">
+                                <span class="level-stat-icon">🦖</span>
+                                <span>2 predators</span>
+                            </div>
+                            <div class="level-stat">
+                                <span class="level-stat-icon">⏱️</span>
+                                <span>Par: 45s</span>
+                            </div>
+                        </div>
+                        <div class="level-stars-earned">
+                            <span class="star-earned">★</span>
+                            <span class="star-earned">★</span>
+                            <span class="star-earned empty">★</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Level 3 - Current -->
+                <div class="level-card">
+                    <div class="level-preview">
+                        <div class="start-zone"></div>
+                        <div class="end-zone"></div>
+                        <div class="obstacle" style="left: 25%; top: 30%; width: 30px; height: 30px;"></div>
+                        <div class="obstacle" style="left: 50%; top: 50%; width: 25px; height: 25px;"></div>
+                        <div class="obstacle" style="left: 70%; top: 35%; width: 20px; height: 20px;"></div>
+                    </div>
+                    <div class="level-info">
+                        <div class="level-header">
+                            <div>
+                                <div class="level-number">Level 3</div>
+                                <div class="level-name">Food Run</div>
+                            </div>
+                            <div class="level-difficulty">
+                                <span class="difficulty-star">★</span>
+                                <span class="difficulty-star">★</span>
+                                <span class="difficulty-star empty">★</span>
+                            </div>
+                        </div>
+                        <div class="level-description">Collect food along the way while avoiding predators. Bonus points for efficiency!</div>
+                        <div class="level-stats">
+                            <div class="level-stat">
+                                <span class="level-stat-icon">🍖</span>
+                                <span>10 food items</span>
+                            </div>
+                            <div class="level-stat">
+                                <span class="level-stat-icon">⏱️</span>
+                                <span>Par: 60s</span>
+                            </div>
+                        </div>
+                        <div class="level-stars-earned">
+                            <span class="star-earned empty">★</span>
+                            <span class="star-earned empty">★</span>
+                            <span class="star-earned empty">★</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Level 4 - Locked -->
+                <div class="level-card locked">
+                    <div class="level-preview">
+                        <div class="level-preview-content">Complete Level 3 to unlock</div>
+                    </div>
+                    <div class="level-lock-overlay">🔒</div>
+                    <div class="level-info">
+                        <div class="level-header">
+                            <div>
+                                <div class="level-number">Level 4</div>
+                                <div class="level-name">The Gauntlet</div>
+                            </div>
+                            <div class="level-difficulty">
+                                <span class="difficulty-star">★</span>
+                                <span class="difficulty-star">★</span>
+                                <span class="difficulty-star">★</span>
+                            </div>
+                        </div>
+                        <div class="level-description">Multiple predators, tight corridors, and limited food. Only the skilled survive.</div>
+                        <div class="level-stats">
+                            <div class="level-stat">
+                                <span class="level-stat-icon">🦖</span>
+                                <span>5 predators</span>
+                            </div>
+                            <div class="level-stat">
+                                <span class="level-stat-icon">⏱️</span>
+                                <span>Par: 90s</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Level 5 - Locked -->
+                <div class="level-card locked">
+                    <div class="level-preview">
+                        <div class="level-preview-content">Complete Level 4 to unlock</div>
+                    </div>
+                    <div class="level-lock-overlay">🔒</div>
+                    <div class="level-info">
+                        <div class="level-header">
+                            <div>
+                                <div class="level-number">Level 5</div>
+                                <div class="level-name">Survival Sprint</div>
+                            </div>
+                            <div class="level-difficulty">
+                                <span class="difficulty-star">★</span>
+                                <span class="difficulty-star">★</span>
+                                <span class="difficulty-star">★</span>
+                            </div>
+                        </div>
+                        <div class="level-description">Race against time. Energy depletes rapidly - find food or perish.</div>
+                        <div class="level-stats">
+                            <div class="level-stat">
+                                <span class="level-stat-icon">⚡</span>
+                                <span>2x energy drain</span>
+                            </div>
+                            <div class="level-stat">
+                                <span class="level-stat-icon">⏱️</span>
+                                <span>Par: 120s</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Level 6 - Locked -->
+                <div class="level-card locked">
+                    <div class="level-preview">
+                        <div class="level-preview-content">Complete Level 5 to unlock</div>
+                    </div>
+                    <div class="level-lock-overlay">🔒</div>
+                    <div class="level-info">
+                        <div class="level-header">
+                            <div>
+                                <div class="level-number">Level 6</div>
+                                <div class="level-name">Night Hunter</div>
+                            </div>
+                            <div class="level-difficulty">
+                                <span class="difficulty-star">★</span>
+                                <span class="difficulty-star">★</span>
+                                <span class="difficulty-star">★</span>
+                            </div>
+                        </div>
+                        <div class="level-description">Navigate in near-darkness. Sound is your only ally.</div>
+                        <div class="level-stats">
+                            <div class="level-stat">
+                                <span class="level-stat-icon">🌙</span>
+                                <span>10% visibility</span>
+                            </div>
+                            <div class="level-stat">
+                                <span class="level-stat-icon">⏱️</span>
+                                <span>Par: 150s</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Challenge View -->
+            <h2 style="color: var(--cyan); margin-bottom: 16px; font-size: 20px;">Active Challenge: Food Run</h2>
+            <div class="challenge-active-container">
+                <div class="challenge-world">
+                    <div class="challenge-world-grid"></div>
+                    <div class="challenge-hud">
+                        <div class="challenge-timer">00:34.7</div>
+                        <div class="challenge-progress">
+                            <div class="checkpoint-dots">
+                                <div class="checkpoint-dot reached"></div>
+                                <div class="checkpoint-dot reached"></div>
+                                <div class="checkpoint-dot current"></div>
+                                <div class="checkpoint-dot"></div>
+                                <div class="checkpoint-dot"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="challenge-sidebar">
+                    <div class="card agent-select-card">
+                        <div class="card-header">
+                            <span class="card-title">Select Agent</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="agent-option selected">
+                                <div class="agent-option-avatar">🤖</div>
+                                <div class="agent-option-info">
+                                    <div class="agent-option-name">Alpha Prime</div>
+                                    <div class="agent-option-stats">Gen 8 • Best: 342s • Score: 2,450</div>
+                                </div>
+                            </div>
+                            <div class="agent-option">
+                                <div class="agent-option-avatar">🤖</div>
+                                <div class="agent-option-info">
+                                    <div class="agent-option-name">Survivor-7</div>
+                                    <div class="agent-option-stats">Gen 6 • Best: 256s • Score: 1,890</div>
+                                </div>
+                            </div>
+                            <div class="agent-option">
+                                <div class="agent-option-avatar">🤖</div>
+                                <div class="agent-option-info">
+                                    <div class="agent-option-name">OG-Hunter</div>
+                                    <div class="agent-option-stats">Gen 4 • Best: 189s • Score: 1,200</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Objectives</span>
+                        </div>
+                        <div class="card-body">
+                            <ul class="objectives-list">
+                                <li class="objective-item">
+                                    <div class="objective-check completed">✓</div>
+                                    <span class="objective-text">Reach Checkpoint 1</span>
+                                    <span class="objective-reward">+50</span>
+                                </li>
+                                <li class="objective-item">
+                                    <div class="objective-check completed">✓</div>
+                                    <span class="objective-text">Reach Checkpoint 2</span>
+                                    <span class="objective-reward">+50</span>
+                                </li>
+                                <li class="objective-item">
+                                    <div class="objective-check"></div>
+                                    <span class="objective-text">Collect 5 food items</span>
+                                    <span class="objective-reward">+100</span>
+                                </li>
+                                <li class="objective-item">
+                                    <div class="objective-check"></div>
+                                    <span class="objective-text">Reach the goal</span>
+                                    <span class="objective-reward">+200</span>
+                                </li>
+                                <li class="objective-item">
+                                    <div class="objective-check"></div>
+                                    <span class="objective-text">Complete under 60s</span>
+                                    <span class="objective-reward">★</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn btn-primary" style="flex: 1;">▶ Start</button>
+                        <button class="btn btn-secondary">↺ Reset</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================
+             SECTION 2: LEADERBOARDS
+             ============================================ -->
+        <section id="leaderboards" class="mockup-section">
+            <h1 class="mockup-section-title">Leaderboards</h1>
+            <p class="mockup-section-subtitle">Compete globally and track your progress against other players.</p>
+
+            <div class="leaderboard-container">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Global Rankings</span>
+                        <div class="leaderboard-tabs">
+                            <button class="leaderboard-tab active">All Time</button>
+                            <button class="leaderboard-tab">This Week</button>
+                            <button class="leaderboard-tab">Today</button>
+                        </div>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <table class="leaderboard-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 60px;">Rank</th>
+                                    <th>Player</th>
+                                    <th>Best Agent</th>
+                                    <th style="width: 100px;">Score</th>
+                                    <th style="width: 80px;">Levels</th>
+                                    <th style="width: 80px;">Stars</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="rank-cell rank-1">1</td>
+                                    <td>
+                                        <div class="player-cell">
+                                            <div class="player-avatar" style="background: var(--gold);">N</div>
+                                            <div>
+                                                <div class="player-name">NeuralNinja</div>
+                                                <div class="player-tag">@neuralninja</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>Apex-Predator-X</td>
+                                    <td class="score-cell">48,230</td>
+                                    <td>20/20</td>
+                                    <td>⭐ 58</td>
+                                </tr>
+                                <tr>
+                                    <td class="rank-cell rank-2">2</td>
+                                    <td>
+                                        <div class="player-cell">
+                                            <div class="player-avatar" style="background: var(--silver);">E</div>
+                                            <div>
+                                                <div class="player-name">EvoMaster</div>
+                                                <div class="player-tag">@evomaster42</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>Darwin-Elite</td>
+                                    <td class="score-cell">45,890</td>
+                                    <td>20/20</td>
+                                    <td>⭐ 55</td>
+                                </tr>
+                                <tr>
+                                    <td class="rank-cell rank-3">3</td>
+                                    <td>
+                                        <div class="player-cell">
+                                            <div class="player-avatar" style="background: var(--bronze);">S</div>
+                                            <div>
+                                                <div class="player-name">SurvivalPro</div>
+                                                <div class="player-tag">@survivalpro</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>Immortal-7</td>
+                                    <td class="score-cell">42,150</td>
+                                    <td>19/20</td>
+                                    <td>⭐ 52</td>
+                                </tr>
+                                <tr>
+                                    <td class="rank-cell">4</td>
+                                    <td>
+                                        <div class="player-cell">
+                                            <div class="player-avatar">G</div>
+                                            <div>
+                                                <div class="player-name">GeneticGuru</div>
+                                                <div class="player-tag">@geneticguru</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>Alpha-Strain</td>
+                                    <td class="score-cell">38,700</td>
+                                    <td>18/20</td>
+                                    <td>⭐ 48</td>
+                                </tr>
+                                <tr class="highlight">
+                                    <td class="rank-cell">42</td>
+                                    <td>
+                                        <div class="player-cell">
+                                            <div class="player-avatar" style="background: var(--cyan);">Y</div>
+                                            <div>
+                                                <div class="player-name">You</div>
+                                                <div class="player-tag">@your_username</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>Alpha Prime</td>
+                                    <td class="score-cell">12,450</td>
+                                    <td>6/20</td>
+                                    <td>⭐ 14</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <div class="card your-stats-card">
+                        <div class="card-header">
+                            <span class="card-title">Your Stats</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="stat-row">
+                                <span class="stat-label">Global Rank</span>
+                                <span class="stat-value">#42 <span class="trend-up">↑5</span></span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Total Score</span>
+                                <span class="stat-value">12,450</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Levels Completed</span>
+                                <span class="stat-value">6 / 20</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Stars Earned</span>
+                                <span class="stat-value">⭐ 14 / 60</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Best Agent Score</span>
+                                <span class="stat-value">2,450</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Agents Trained</span>
+                                <span class="stat-value">12</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Weekly Challenge</span>
+                        </div>
+                        <div class="card-body" style="text-align: center;">
+                            <div style="font-size: 48px; margin-bottom: 8px;">🏆</div>
+                            <div style="font-size: 18px; font-weight: bold; color: var(--text-bright); margin-bottom: 8px;">Speed Demon</div>
+                            <div style="font-size: 13px; color: var(--text-dim); margin-bottom: 16px;">Complete Level 3 in under 45 seconds</div>
+                            <div style="font-size: 24px; color: var(--cyan); font-weight: bold; margin-bottom: 8px;">2d 14h remaining</div>
+                            <div style="font-size: 12px; color: var(--yellow);">Prize: Exclusive "Lightning" skin</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================
+             SECTION 3: MULTIPLAYER ARENA
+             ============================================ -->
+        <section id="arena" class="mockup-section">
+            <h1 class="mockup-section-title">Multiplayer Arena</h1>
+            <p class="mockup-section-subtitle">Challenge other players in real-time competition!</p>
+
+            <!-- Game Modes -->
+            <div class="arena-modes">
+                <div class="arena-mode-card">
+                    <div class="arena-mode-icon">⚔️</div>
+                    <div class="arena-mode-name">1v1 Race</div>
+                    <div class="arena-mode-desc">Head-to-head race to the finish. First agent to complete the course wins!</div>
+                    <div class="arena-mode-players">342 players online</div>
+                    <button class="btn btn-primary" style="margin-top: 16px; width: 100%;">Quick Match</button>
+                </div>
+
+                <div class="arena-mode-card">
+                    <div class="arena-mode-icon">👥</div>
+                    <div class="arena-mode-name">Team Survival</div>
+                    <div class="arena-mode-desc">2v2 team battles. Work together to outlast the opposing team!</div>
+                    <div class="arena-mode-players">156 players online</div>
+                    <button class="btn btn-primary" style="margin-top: 16px; width: 100%;">Find Team</button>
+                </div>
+
+                <div class="arena-mode-card">
+                    <div class="arena-mode-icon">🎲</div>
+                    <div class="arena-mode-name">Draft Battle</div>
+                    <div class="arena-mode-desc">Pick agents from a shared pool. Strategy meets evolution!</div>
+                    <div class="arena-mode-players">89 players online</div>
+                    <button class="btn btn-primary" style="margin-top: 16px; width: 100%;">Join Draft</button>
+                </div>
+            </div>
+
+            <!-- Match Lobby -->
+            <h2 style="color: var(--cyan); margin-bottom: 16px; font-size: 20px;">Match Lobby</h2>
+            <div class="match-lobby">
+                <!-- Team Blue -->
+                <div class="team-panel">
+                    <div class="team-header team-blue">Team Blue</div>
+                    <div class="team-slots">
+                        <div class="team-slot">
+                            <div class="slot-avatar" style="background: #4488ff;">🤖</div>
+                            <div class="slot-info">
+                                <div class="slot-name">You (Alpha Prime)</div>
+                                <div class="slot-rating">Rating: 1,450 • W/L: 24/18</div>
+                            </div>
+                            <div class="slot-ready is-ready"></div>
+                        </div>
+                        <div class="team-slot">
+                            <div class="slot-avatar" style="background: #4488ff;">🤖</div>
+                            <div class="slot-info">
+                                <div class="slot-name">TeamMate42 (Swift-Runner)</div>
+                                <div class="slot-rating">Rating: 1,320 • W/L: 19/21</div>
+                            </div>
+                            <div class="slot-ready is-ready"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Arena Preview -->
+                <div class="arena-preview">
+                    <div class="arena-preview-header">
+                        <span style="font-weight: bold; color: var(--cyan);">Arena: The Crucible</span>
+                    </div>
+                    <div class="arena-preview-map">
+                        <!-- Map preview would go here -->
+                    </div>
+                    <div class="arena-preview-footer">
+                        <div class="match-settings">
+                            <div class="match-setting">
+                                <div class="match-setting-label">Mode</div>
+                                <div class="match-setting-value">Team Survival</div>
+                            </div>
+                            <div class="match-setting">
+                                <div class="match-setting-label">Time Limit</div>
+                                <div class="match-setting-value">5:00</div>
+                            </div>
+                            <div class="match-setting">
+                                <div class="match-setting-label">Predators</div>
+                                <div class="match-setting-value">4</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-success" style="width: 100%;">Start Match (2/4 Ready)</button>
+                    </div>
+                </div>
+
+                <!-- Team Red -->
+                <div class="team-panel">
+                    <div class="team-header team-red">Team Red</div>
+                    <div class="team-slots">
+                        <div class="team-slot">
+                            <div class="slot-avatar" style="background: var(--red);">🤖</div>
+                            <div class="slot-info">
+                                <div class="slot-name">Opponent123 (Stalker-X)</div>
+                                <div class="slot-rating">Rating: 1,580 • W/L: 31/15</div>
+                            </div>
+                            <div class="slot-ready"></div>
+                        </div>
+                        <div class="team-slot empty">
+                            <span>Waiting for player...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Matches -->
+            <h2 style="color: var(--cyan); margin: 32px 0 16px; font-size: 20px;">Recent Matches</h2>
+            <div class="card">
+                <div class="card-body" style="padding: 0;">
+                    <table class="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th>Result</th>
+                                <th>Mode</th>
+                                <th>Opponent</th>
+                                <th>Your Agent</th>
+                                <th>Duration</th>
+                                <th>Rating Change</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="badge badge-green">WIN</span></td>
+                                <td>1v1 Race</td>
+                                <td>SpeedyGonzales</td>
+                                <td>Alpha Prime</td>
+                                <td>1:23</td>
+                                <td class="trend-up">+24</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge badge-green">WIN</span></td>
+                                <td>Team Survival</td>
+                                <td>Team Apex</td>
+                                <td>Survivor-7</td>
+                                <td>4:45</td>
+                                <td class="trend-up">+18</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge badge-red">LOSS</span></td>
+                                <td>1v1 Race</td>
+                                <td>NeuralNinja</td>
+                                <td>Alpha Prime</td>
+                                <td>0:58</td>
+                                <td class="trend-down">-15</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================
+             SECTION 4: AGENT PROFILE
+             ============================================ -->
+        <section id="profile" class="mockup-section">
+            <h1 class="mockup-section-title">Agent Profile</h1>
+            <p class="mockup-section-subtitle">Deep dive into your agent's performance, lineage, and achievements.</p>
+
+            <!-- Profile Header -->
+            <div class="profile-header">
+                <div class="profile-avatar-large">🤖</div>
+                <div class="profile-info">
+                    <div class="profile-name">Alpha Prime</div>
+                    <div class="profile-title">Generation 8 • Elite Survivor</div>
+                    <div class="profile-badges">
+                        <span class="badge badge-gold">Top 10%</span>
+                        <span class="badge badge-cyan">Veteran</span>
+                        <span class="badge badge-green">Predator Slayer</span>
+                    </div>
+                    <div class="profile-quick-stats">
+                        <div class="quick-stat">
+                            <div class="quick-stat-value">2,450</div>
+                            <div class="quick-stat-label">Score</div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-value">45.2h</div>
+                            <div class="quick-stat-label">Total Time</div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-value">342</div>
+                            <div class="quick-stat-label">Best Life</div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-value">147</div>
+                            <div class="quick-stat-label">Food Eaten</div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-value">12</div>
+                            <div class="quick-stat-label">Offspring</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="profile-actions">
+                    <button class="btn btn-primary">Use in Challenge</button>
+                    <button class="btn btn-secondary">Edit Genome</button>
+                    <button class="btn btn-secondary">Export Agent</button>
+                </div>
+            </div>
+
+            <div class="profile-content">
+                <div style="display: flex; flex-direction: column; gap: 24px;">
+                    <!-- Performance Over Time -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Performance History</span>
+                            <select style="background: var(--bg-input); border: 1px solid var(--bg-hover); color: var(--text-normal); padding: 4px 8px; border-radius: 4px;">
+                                <option>Last 7 Days</option>
+                                <option>Last 30 Days</option>
+                                <option>All Time</option>
+                            </select>
+                        </div>
+                        <div class="card-body">
+                            <div class="performance-chart">
+                                <div class="chart-bar" style="height: 60%;" data-value="Mon"></div>
+                                <div class="chart-bar" style="height: 75%;" data-value="Tue"></div>
+                                <div class="chart-bar" style="height: 45%;" data-value="Wed"></div>
+                                <div class="chart-bar" style="height: 90%;" data-value="Thu"></div>
+                                <div class="chart-bar" style="height: 70%;" data-value="Fri"></div>
+                                <div class="chart-bar" style="height: 85%;" data-value="Sat"></div>
+                                <div class="chart-bar" style="height: 95%;" data-value="Sun"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Achievements -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Achievements</span>
+                            <span style="color: var(--text-dim); font-size: 12px;">8 / 24 Unlocked</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="achievements-grid">
+                                <div class="achievement unlocked">
+                                    <div class="achievement-icon">🏃</div>
+                                    <div class="achievement-name">First Steps</div>
+                                </div>
+                                <div class="achievement unlocked">
+                                    <div class="achievement-icon">🍖</div>
+                                    <div class="achievement-name">Hungry</div>
+                                </div>
+                                <div class="achievement unlocked">
+                                    <div class="achievement-icon">⏱️</div>
+                                    <div class="achievement-name">Survivor</div>
+                                </div>
+                                <div class="achievement unlocked">
+                                    <div class="achievement-icon">🧬</div>
+                                    <div class="achievement-name">Evolved</div>
+                                </div>
+                                <div class="achievement unlocked">
+                                    <div class="achievement-icon">👶</div>
+                                    <div class="achievement-name">Parent</div>
+                                </div>
+                                <div class="achievement unlocked">
+                                    <div class="achievement-icon">🦖</div>
+                                    <div class="achievement-name">Escape Artist</div>
+                                </div>
+                                <div class="achievement unlocked">
+                                    <div class="achievement-icon">🏆</div>
+                                    <div class="achievement-name">Champion</div>
+                                </div>
+                                <div class="achievement unlocked">
+                                    <div class="achievement-icon">⚡</div>
+                                    <div class="achievement-name">Speed Demon</div>
+                                </div>
+                                <div class="achievement">
+                                    <div class="achievement-icon">👑</div>
+                                    <div class="achievement-name">Apex Predator</div>
+                                </div>
+                                <div class="achievement">
+                                    <div class="achievement-icon">🌟</div>
+                                    <div class="achievement-name">Perfect Run</div>
+                                </div>
+                                <div class="achievement">
+                                    <div class="achievement-icon">🔥</div>
+                                    <div class="achievement-name">Unstoppable</div>
+                                </div>
+                                <div class="achievement">
+                                    <div class="achievement-icon">💎</div>
+                                    <div class="achievement-name">Legendary</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 24px;">
+                    <!-- Detailed Stats -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Detailed Statistics</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="stat-row">
+                                <span class="stat-label">Total Time Alive</span>
+                                <span class="stat-value">45h 23m</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Longest Single Life</span>
+                                <span class="stat-value">342s</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Average Lifespan</span>
+                                <span class="stat-value">124s</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Total Food Eaten</span>
+                                <span class="stat-value">147</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Food per Minute</span>
+                                <span class="stat-value">2.4</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Total Deaths</span>
+                                <span class="stat-value">28</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Deaths to Predators</span>
+                                <span class="stat-value">15 (54%)</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Deaths to Starvation</span>
+                                <span class="stat-value">13 (46%)</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Offspring Produced</span>
+                                <span class="stat-value">12</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Challenges Completed</span>
+                                <span class="stat-value">6</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Multiplayer Wins</span>
+                                <span class="stat-value">24 (57%)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lineage -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Family Lineage</span>
+                        </div>
+                        <div class="lineage-tree">
+                            <div class="lineage-node">
+                                <div class="lineage-avatar">🤖</div>
+                                <div class="lineage-info">
+                                    <div class="lineage-name">OG-Ancestor (Gen 1)</div>
+                                    <div class="lineage-stats">Best: 89s • Food: 12</div>
+                                </div>
+                            </div>
+                            <div class="lineage-node child">
+                                <div class="lineage-avatar">🤖</div>
+                                <div class="lineage-info">
+                                    <div class="lineage-name">Proto-Alpha (Gen 4)</div>
+                                    <div class="lineage-stats">Best: 156s • Food: 34</div>
+                                </div>
+                            </div>
+                            <div class="lineage-node child">
+                                <div class="lineage-avatar" style="background: var(--cyan);">🤖</div>
+                                <div class="lineage-info">
+                                    <div class="lineage-name" style="color: var(--cyan);">Alpha Prime (Gen 8) ← You</div>
+                                    <div class="lineage-stats">Best: 342s • Food: 147</div>
+                                </div>
+                            </div>
+                            <div class="lineage-node child">
+                                <div class="lineage-avatar">🤖</div>
+                                <div class="lineage-info">
+                                    <div class="lineage-name">Alpha-Junior-1 (Gen 9)</div>
+                                    <div class="lineage-stats">Best: 78s • Food: 8</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================
+             SECTION 5: SCORING SYSTEM
+             ============================================ -->
+        <section id="scoring" class="mockup-section">
+            <h1 class="mockup-section-title">Scoring System</h1>
+            <p class="mockup-section-subtitle">Understanding how agent performance is measured and ranked.</p>
+
+            <!-- Formula -->
+            <div class="scoring-formula">
+                <div class="formula-text">Score = (Survival × 40%) + (Efficiency × 25%) + (Evasion × 20%) + (Legacy × 15%)</div>
+                <div class="formula-explanation">Each component is normalized to 0-100 before weighting</div>
+            </div>
+
+            <!-- Score Components -->
+            <div class="score-breakdown">
+                <div class="score-component">
+                    <div class="score-component-icon">⏱️</div>
+                    <div class="score-component-name">Survival</div>
+                    <div class="score-component-value">82</div>
+                    <div class="score-component-weight">40% weight</div>
+                    <div style="font-size: 11px; color: var(--text-dim); margin-top: 8px;">
+                        Total time alive across all lives
+                    </div>
+                </div>
+
+                <div class="score-component">
+                    <div class="score-component-icon">🍖</div>
+                    <div class="score-component-name">Efficiency</div>
+                    <div class="score-component-value">71</div>
+                    <div class="score-component-weight">25% weight</div>
+                    <div style="font-size: 11px; color: var(--text-dim); margin-top: 8px;">
+                        Food eaten per minute of survival
+                    </div>
+                </div>
+
+                <div class="score-component">
+                    <div class="score-component-icon">🦖</div>
+                    <div class="score-component-name">Evasion</div>
+                    <div class="score-component-value">65</div>
+                    <div class="score-component-weight">20% weight</div>
+                    <div style="font-size: 11px; color: var(--text-dim); margin-top: 8px;">
+                        Survival rate vs predator encounters
+                    </div>
+                </div>
+
+                <div class="score-component">
+                    <div class="score-component-icon">👶</div>
+                    <div class="score-component-name">Legacy</div>
+                    <div class="score-component-value">58</div>
+                    <div class="score-component-weight">15% weight</div>
+                    <div style="font-size: 11px; color: var(--text-dim); margin-top: 8px;">
+                        Offspring produced & their success
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                <!-- Challenge Scoring -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Challenge Scoring</span>
+                    </div>
+                    <div class="card-body">
+                        <p style="margin-bottom: 16px; color: var(--text-dim);">Points earned during challenge runs:</p>
+
+                        <div style="margin-bottom: 16px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Checkpoint reached</span>
+                                <span class="stat-value">+50 pts</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Food collected</span>
+                                <span class="stat-value">+10 pts each</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Goal reached</span>
+                                <span class="stat-value">+200 pts</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Time bonus (under par)</span>
+                                <span class="stat-value">+5 pts/sec</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>No damage taken</span>
+                                <span class="stat-value">+100 pts</span>
+                            </div>
+                        </div>
+
+                        <div style="background: var(--bg-input); padding: 12px; border-radius: 8px;">
+                            <div style="font-weight: bold; color: var(--yellow); margin-bottom: 8px;">⭐ Star Requirements</div>
+                            <div style="font-size: 12px; color: var(--text-dim);">
+                                ⭐ Complete level<br>
+                                ⭐⭐ Complete under par time<br>
+                                ⭐⭐⭐ Perfect run (no damage, all food)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Multiplayer Scoring -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Multiplayer Rating</span>
+                    </div>
+                    <div class="card-body">
+                        <p style="margin-bottom: 16px; color: var(--text-dim);">ELO-based rating system for competitive play:</p>
+
+                        <div style="margin-bottom: 16px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Starting rating</span>
+                                <span class="stat-value">1,000</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Win vs equal rating</span>
+                                <span class="stat-value trend-up">+20</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Win vs higher rating</span>
+                                <span class="stat-value trend-up">+25 to +40</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Loss vs equal rating</span>
+                                <span class="stat-value trend-down">-15</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Loss vs lower rating</span>
+                                <span class="stat-value trend-down">-20 to -35</span>
+                            </div>
+                        </div>
+
+                        <div style="background: var(--bg-input); padding: 12px; border-radius: 8px;">
+                            <div style="font-weight: bold; color: var(--cyan); margin-bottom: 8px;">🏆 Rank Tiers</div>
+                            <div style="font-size: 12px; color: var(--text-dim);">
+                                Bronze: 0-999 • Silver: 1000-1499<br>
+                                Gold: 1500-1999 • Platinum: 2000-2499<br>
+                                Diamond: 2500+ • Master: Top 100
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================
+             SECTION 6: PROGRESSION SYSTEM
+             ============================================ -->
+        <section id="progression" class="mockup-section">
+            <h1 class="mockup-section-title">Agent Progression</h1>
+            <p class="mockup-section-subtitle">In Game Mode, agents earn stat upgrades through performance - no manual tweaking allowed!</p>
+
+            <!-- Mode Comparison -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px;">
+                <div class="card" style="border-color: var(--purple);">
+                    <div class="card-header" style="background: rgba(170, 102, 255, 0.2);">
+                        <span class="card-title" style="color: var(--purple);">🧪 Simulation Mode</span>
+                    </div>
+                    <div class="card-body">
+                        <ul style="list-style: none; font-size: 14px; line-height: 2;">
+                            <li>✓ Full genome editor access</li>
+                            <li>✓ Adjust any stat manually</li>
+                            <li>✓ Experiment freely</li>
+                            <li>✓ No progression tracking</li>
+                            <li>✓ Perfect for learning & testing</li>
+                        </ul>
+                        <div style="margin-top: 16px; padding: 12px; background: var(--bg-input); border-radius: 8px; font-size: 12px; color: var(--text-dim);">
+                            Use this mode to understand how different stats affect behavior before committing to training an agent in Game Mode.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="border-color: var(--cyan);">
+                    <div class="card-header" style="background: rgba(0, 255, 255, 0.1);">
+                        <span class="card-title" style="color: var(--cyan);">🎮 Game Mode</span>
+                    </div>
+                    <div class="card-body">
+                        <ul style="list-style: none; font-size: 14px; line-height: 2;">
+                            <li>✓ Stats earned through performance</li>
+                            <li>✓ Milestone-based upgrades</li>
+                            <li>✓ Leaderboard eligible</li>
+                            <li>✓ Meaningful progression</li>
+                            <li>✓ Competitive & rewarding</li>
+                        </ul>
+                        <div style="margin-top: 16px; padding: 12px; background: var(--bg-input); border-radius: 8px; font-size: 12px; color: var(--text-dim);">
+                            Your agent's capabilities reflect its actual performance. Better survival = stronger agent. Fair competition guaranteed.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Agent Progression -->
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <span class="card-title">Alpha Prime - Progression Status</span>
+                    <span class="badge badge-cyan">Level 12</span>
+                </div>
+                <div class="card-body">
+                    <!-- XP Bar -->
+                    <div style="margin-bottom: 24px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="font-weight: bold; color: var(--text-bright);">Experience Points</span>
+                            <span class="stat-value">2,450 / 3,000 XP</span>
+                        </div>
+                        <div style="height: 24px; background: var(--bg-input); border-radius: 12px; overflow: hidden; position: relative;">
+                            <div style="width: 82%; height: 100%; background: linear-gradient(90deg, var(--cyan-dim), var(--cyan)); border-radius: 12px;"></div>
+                            <span style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 12px; font-weight: bold; color: var(--bg-darkest);">82% to Level 13</span>
+                        </div>
+                    </div>
+
+                    <!-- Current Stats with Earned Bonuses -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+                        <div style="background: var(--bg-input); padding: 16px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 12px; color: var(--text-dim); margin-bottom: 4px;">Max Speed</div>
+                            <div style="font-size: 24px; font-weight: bold; color: var(--text-bright);">165</div>
+                            <div style="font-size: 11px; color: var(--green);">+15 earned</div>
+                        </div>
+                        <div style="background: var(--bg-input); padding: 16px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 12px; color: var(--text-dim); margin-bottom: 4px;">Vision Range</div>
+                            <div style="font-size: 24px; font-weight: bold; color: var(--text-bright);">215</div>
+                            <div style="font-size: 11px; color: var(--green);">+15 earned</div>
+                        </div>
+                        <div style="background: var(--bg-input); padding: 16px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 12px; color: var(--text-dim); margin-bottom: 4px;">Energy Efficiency</div>
+                            <div style="font-size: 24px; font-weight: bold; color: var(--text-bright);">0.85</div>
+                            <div style="font-size: 11px; color: var(--green);">+0.10 earned</div>
+                        </div>
+                        <div style="background: var(--bg-input); padding: 16px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 12px; color: var(--text-dim); margin-bottom: 4px;">Hearing Range</div>
+                            <div style="font-size: 24px; font-weight: bold; color: var(--text-bright);">320</div>
+                            <div style="font-size: 11px; color: var(--green);">+20 earned</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Milestone Tracks -->
+            <h2 style="color: var(--cyan); margin-bottom: 16px; font-size: 20px;">Milestone Tracks</h2>
+            <p style="color: var(--text-dim); margin-bottom: 16px;">Complete milestones to permanently upgrade your agent's stats. Each track focuses on a different aspect of survival.</p>
+
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 32px;">
+                <!-- Survival Track -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">⏱️ Survival Track</span>
+                        <span style="color: var(--text-dim); font-size: 12px;">Rewards: Max Energy & Health</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 255, 136, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--green);">
+                            <div style="font-size: 24px;">✓</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-bright);">First Breath</div>
+                                <div style="font-size: 12px; color: var(--text-dim);">Survive 60 seconds total</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--green); font-weight: bold;">+5 Max Energy</div>
+                                <div style="font-size: 10px; color: var(--text-dim);">COMPLETED</div>
+                            </div>
+                        </div>
+
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 255, 136, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--green);">
+                            <div style="font-size: 24px;">✓</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-bright);">Survivor</div>
+                                <div style="font-size: 12px; color: var(--text-dim);">Survive 5 minutes total</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--green); font-weight: bold;">+10 Max Health</div>
+                                <div style="font-size: 10px; color: var(--text-dim);">COMPLETED</div>
+                            </div>
+                        </div>
+
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 255, 255, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--cyan);">
+                            <div style="font-size: 24px; color: var(--cyan);">◐</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-bright);">Enduring</div>
+                                <div style="font-size: 12px; color: var(--text-dim);">Survive 30 minutes total (23m / 30m)</div>
+                                <div style="height: 4px; background: var(--bg-input); border-radius: 2px; margin-top: 6px;">
+                                    <div style="width: 77%; height: 100%; background: var(--cyan); border-radius: 2px;"></div>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--cyan); font-weight: bold;">+15 Max Energy</div>
+                                <div style="font-size: 10px; color: var(--text-dim);">77% complete</div>
+                            </div>
+                        </div>
+
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg-input); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--text-disabled); opacity: 0.6;">
+                            <div style="font-size: 24px;">🔒</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-dim);">Immortal</div>
+                                <div style="font-size: 12px; color: var(--text-disabled);">Survive 2 hours total</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--text-disabled); font-weight: bold;">+25 Max Health</div>
+                                <div style="font-size: 10px; color: var(--text-disabled);">LOCKED</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Foraging Track -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">🍖 Foraging Track</span>
+                        <span style="color: var(--text-dim); font-size: 12px;">Rewards: Vision & Speed</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 255, 136, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--green);">
+                            <div style="font-size: 24px;">✓</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-bright);">First Meal</div>
+                                <div style="font-size: 12px; color: var(--text-dim);">Eat 10 food items</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--green); font-weight: bold;">+5 Vision Range</div>
+                                <div style="font-size: 10px; color: var(--text-dim);">COMPLETED</div>
+                            </div>
+                        </div>
+
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 255, 136, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--green);">
+                            <div style="font-size: 24px;">✓</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-bright);">Hungry</div>
+                                <div style="font-size: 12px; color: var(--text-dim);">Eat 50 food items</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--green); font-weight: bold;">+5 Max Speed</div>
+                                <div style="font-size: 10px; color: var(--text-dim);">COMPLETED</div>
+                            </div>
+                        </div>
+
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 255, 136, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--green);">
+                            <div style="font-size: 24px;">✓</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-bright);">Efficient Hunter</div>
+                                <div style="font-size: 12px; color: var(--text-dim);">Eat 100 food items</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--green); font-weight: bold;">+10 Vision Range</div>
+                                <div style="font-size: 10px; color: var(--text-dim);">COMPLETED</div>
+                            </div>
+                        </div>
+
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 255, 255, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--cyan);">
+                            <div style="font-size: 24px; color: var(--cyan);">◐</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-bright);">Master Forager</div>
+                                <div style="font-size: 12px; color: var(--text-dim);">Eat 500 food items (147 / 500)</div>
+                                <div style="height: 4px; background: var(--bg-input); border-radius: 2px; margin-top: 6px;">
+                                    <div style="width: 29%; height: 100%; background: var(--cyan); border-radius: 2px;"></div>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--cyan); font-weight: bold;">+10 Max Speed</div>
+                                <div style="font-size: 10px; color: var(--text-dim);">29% complete</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Evasion Track -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">🦖 Evasion Track</span>
+                        <span style="color: var(--text-dim); font-size: 12px;">Rewards: Agility & Hearing</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 255, 136, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--green);">
+                            <div style="font-size: 24px;">✓</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-bright);">Close Call</div>
+                                <div style="font-size: 12px; color: var(--text-dim);">Escape a predator within 50 units</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--green); font-weight: bold;">+10 Hearing Range</div>
+                                <div style="font-size: 10px; color: var(--text-dim);">COMPLETED</div>
+                            </div>
+                        </div>
+
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 255, 136, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--green);">
+                            <div style="font-size: 24px;">✓</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-bright);">Escape Artist</div>
+                                <div style="font-size: 12px; color: var(--text-dim);">Escape 10 predator encounters</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--green); font-weight: bold;">+0.2 Turn Speed</div>
+                                <div style="font-size: 10px; color: var(--text-dim);">COMPLETED</div>
+                            </div>
+                        </div>
+
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 255, 255, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--cyan);">
+                            <div style="font-size: 24px; color: var(--cyan);">◐</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-bright);">Untouchable</div>
+                                <div style="font-size: 12px; color: var(--text-dim);">Survive 60s in a predator zone without damage (42s best)</div>
+                                <div style="height: 4px; background: var(--bg-input); border-radius: 2px; margin-top: 6px;">
+                                    <div style="width: 70%; height: 100%; background: var(--cyan); border-radius: 2px;"></div>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--cyan); font-weight: bold;">+10 Hearing Range</div>
+                                <div style="font-size: 10px; color: var(--text-dim);">70% complete</div>
+                            </div>
+                        </div>
+
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg-input); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--text-disabled); opacity: 0.6;">
+                            <div style="font-size: 24px;">🔒</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-dim);">Ghost</div>
+                                <div style="font-size: 12px; color: var(--text-disabled);">Complete Level 6 (Night Hunter) without damage</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--text-disabled); font-weight: bold;">+0.5 Turn Speed</div>
+                                <div style="font-size: 10px; color: var(--text-disabled);">LOCKED</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legacy Track -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">👶 Legacy Track</span>
+                        <span style="color: var(--text-dim); font-size: 12px;">Rewards: Breeding & All Stats</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 255, 136, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--green);">
+                            <div style="font-size: 24px;">✓</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-bright);">First Child</div>
+                                <div style="font-size: 12px; color: var(--text-dim);">Produce 1 offspring</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--green); font-weight: bold;">-5% Breed Cost</div>
+                                <div style="font-size: 10px; color: var(--text-dim);">COMPLETED</div>
+                            </div>
+                        </div>
+
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 255, 136, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--green);">
+                            <div style="font-size: 24px;">✓</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-bright);">Parent</div>
+                                <div style="font-size: 12px; color: var(--text-dim);">Produce 5 offspring</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--green); font-weight: bold;">+2% All Stats</div>
+                                <div style="font-size: 10px; color: var(--text-dim);">COMPLETED</div>
+                            </div>
+                        </div>
+
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 255, 255, 0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--cyan);">
+                            <div style="font-size: 24px; color: var(--cyan);">◐</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-bright);">Lineage Founder</div>
+                                <div style="font-size: 12px; color: var(--text-dim);">Have offspring survive 60s each (12 / 20)</div>
+                                <div style="height: 4px; background: var(--bg-input); border-radius: 2px; margin-top: 6px;">
+                                    <div style="width: 60%; height: 100%; background: var(--cyan); border-radius: 2px;"></div>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--cyan); font-weight: bold;">+5% All Stats</div>
+                                <div style="font-size: 10px; color: var(--text-dim);">60% complete</div>
+                            </div>
+                        </div>
+
+                        <div class="milestone-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg-input); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--text-disabled); opacity: 0.6;">
+                            <div style="font-size: 24px;">🔒</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold; color: var(--text-dim);">Dynasty</div>
+                                <div style="font-size: 12px; color: var(--text-disabled);">Reach Generation 10 with surviving lineage</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--text-disabled); font-weight: bold;">+10% All Stats</div>
+                                <div style="font-size: 10px; color: var(--text-disabled);">LOCKED</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prestige System -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">🌟 Prestige System</span>
+                    <span style="color: var(--text-dim); font-size: 12px;">Reset for permanent bonuses</span>
+                </div>
+                <div class="card-body">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                        <div>
+                            <h3 style="color: var(--text-bright); margin-bottom: 12px;">What is Prestige?</h3>
+                            <p style="color: var(--text-dim); line-height: 1.6; margin-bottom: 16px;">
+                                When your agent reaches Level 20, you can choose to <strong style="color: var(--yellow);">Prestige</strong>.
+                                This resets your agent back to Level 1 with base stats, but grants a permanent
+                                <strong style="color: var(--cyan);">Prestige Bonus</strong> that applies to all future progression.
+                            </p>
+                            <ul style="list-style: none; color: var(--text-dim); line-height: 2;">
+                                <li>⭐ Prestige 1: +5% XP gain, +2% base stats</li>
+                                <li>⭐⭐ Prestige 2: +10% XP gain, +5% base stats</li>
+                                <li>⭐⭐⭐ Prestige 3: +15% XP gain, +8% base stats</li>
+                                <li>⭐⭐⭐⭐ Prestige 4: +20% XP gain, +12% base stats</li>
+                                <li>⭐⭐⭐⭐⭐ Prestige 5: +25% XP gain, +15% base stats, exclusive skin</li>
+                            </ul>
+                        </div>
+                        <div style="background: var(--bg-input); padding: 20px; border-radius: 12px; text-align: center;">
+                            <div style="font-size: 14px; color: var(--text-dim); margin-bottom: 8px;">Current Prestige Level</div>
+                            <div style="font-size: 48px; margin-bottom: 8px;">⭐⭐</div>
+                            <div style="font-size: 24px; font-weight: bold; color: var(--yellow); margin-bottom: 16px;">Prestige 2</div>
+                            <div style="font-size: 13px; color: var(--green); margin-bottom: 16px;">
+                                Active Bonuses: +10% XP, +5% Base Stats
+                            </div>
+                            <div style="font-size: 12px; color: var(--text-dim); margin-bottom: 16px;">
+                                Reach Level 20 to prestige again<br>
+                                Current: Level 12 (8 levels to go)
+                            </div>
+                            <button class="btn btn-secondary" style="opacity: 0.5; cursor: not-allowed;">
+                                🔒 Prestige (Reach Lv.20)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('.mockup-section').forEach(s => s.classList.remove('active'));
+            // Show selected section
+            document.getElementById(sectionId).classList.add('active');
+
+            // Update nav tabs
+            document.querySelectorAll('.mockup-nav-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        // Agent selection
+        document.querySelectorAll('.agent-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.agent-option').forEach(o => o.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+
+        // Level card hover effects
+        document.querySelectorAll('.level-card:not(.locked)').forEach(card => {
+            card.addEventListener('click', function() {
+                // Could navigate to challenge view
+                console.log('Level selected:', this.querySelector('.level-name').textContent);
+            });
+        });
+
+        // Leaderboard tabs
+        document.querySelectorAll('.leaderboard-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.leaderboard-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

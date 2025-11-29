@@ -272,10 +272,10 @@ class World:
         """Spawn a food item at random location.
 
         Creates food with margin from world edges and avoids spawning
-        on top of vegetation.
+        on top of vegetation, water, or other entities.
         """
         margin = 50.0
-        max_attempts = 10
+        max_attempts = 20
 
         for _ in range(max_attempts):
             x = np.random.uniform(margin, self.width - margin)
@@ -288,6 +288,27 @@ class World:
                 if pos.distance_to(veg.position) < veg.radius + 10:  # 10 unit buffer
                     overlaps = True
                     break
+
+            # Check if position overlaps with water or other static entities
+            if not overlaps:
+                for static in self.static_entities:
+                    if hasattr(static, 'radius') and pos.distance_to(static.position) < static.radius + 10:
+                        overlaps = True
+                        break
+
+            # Check if position overlaps with existing food
+            if not overlaps:
+                for food_item in self.food_items:
+                    if food_item.is_active and pos.distance_to(food_item.position) < 15:
+                        overlaps = True
+                        break
+
+            # Check if position overlaps with predators
+            if not overlaps:
+                for pred in self.predators:
+                    if pred.is_active and pos.distance_to(pred.position) < pred.radius + 10:
+                        overlaps = True
+                        break
 
             if not overlaps:
                 food = Food(
