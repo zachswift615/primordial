@@ -194,12 +194,18 @@ class CockpitApp:
                             self.active_slider = key
                             break
 
-                # Agent table row clicks
+                # Agent table row clicks - check FIRST to prevent race condition with world click
                 if self.right_panel_visible and hasattr(self, 'agent_table_rows'):
                     for row_rect, agent_id in self.agent_table_rows:
                         if row_rect.collidepoint(mouse_pos):
                             self.selected_agent_id = agent_id
-                            break
+                            return  # Early return prevents world click from also firing
+
+                # World click to select agent (only if we didn't click the table)
+                world_rect, _, _, _ = self._get_world_transform()
+                if world_rect.collidepoint(mouse_pos):
+                    world_x, world_y = self._screen_to_world(mouse_pos)
+                    self._select_agent_at_world_pos(world_x, world_y)
 
             if event.type == pygame.MOUSEBUTTONUP:
                 self.active_slider = None
@@ -893,6 +899,39 @@ class CockpitApp:
         offset_y = world_rect.top + (world_rect.height - self.simulation.world.height * scale) / 2
 
         return world_rect, scale, offset_x, offset_y
+
+    def _screen_to_world(self, screen_pos: tuple) -> tuple:
+        """Convert screen position to world position.
+
+        Uses _get_world_transform() to reuse transform calculation (DRY).
+        """
+        world_rect, scale, offset_x, offset_y = self._get_world_transform()
+
+        world_x = (screen_pos[0] - offset_x) / scale
+        world_y = (screen_pos[1] - offset_y) / scale
+
+        return world_x, world_y
+
+    def _select_agent_at_world_pos(self, world_x: float, world_y: float) -> None:
+        """Select agent nearest to world position."""
+        from primordial.world.geometry import Vec2
+
+        pos = Vec2(world_x, world_y)
+        nearest_id = None
+        nearest_dist = float('inf')
+
+        for agent_id, wrapper in self.simulation.agents.items():
+            if not wrapper.agent.is_alive:
+                continue
+            dist = pos.distance_to(wrapper.agent.position)
+            if dist < nearest_dist and dist < 30:
+                nearest_id = agent_id
+                nearest_dist = dist
+
+        if nearest_id:
+            self.selected_agent_id = nearest_id
+        else:
+            self.selected_agent_id = None
 
     def _rebuild_layout(self) -> None:
         """Rebuild UI layout after panel toggle or resize."""
