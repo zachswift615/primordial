@@ -185,6 +185,9 @@ class CockpitApp:
         # Control mode
         self.control_mode = False
 
+        # HUD visibility
+        self.hud_visible = True
+
         # Modal state
         self.help_modal_open = False
         self.genome_editor_open = False
@@ -289,8 +292,13 @@ class CockpitApp:
                 elif event.key == pygame.K_l:
                     self._list_saved_agents()
                 elif event.key == pygame.K_h:
-                    # Toggle help modal
-                    self.help_modal_open = not self.help_modal_open
+                    mods_h = pygame.key.get_mods()
+                    if mods_h & pygame.KMOD_SHIFT:
+                        # Shift+H toggles HUD
+                        self.hud_visible = not self.hud_visible
+                    else:
+                        # H toggles help
+                        self.help_modal_open = not self.help_modal_open
                 elif event.key == pygame.K_c:
                     # Toggle control mode (requires selected agent)
                     if self.selected_agent_id:
@@ -668,6 +676,20 @@ class CockpitApp:
 
         self.ui_manager.update(dt)
 
+    def _get_world_rect(self) -> pygame.Rect:
+        """Get the screen rectangle for the world view, accounting for panels and HUD."""
+        top = self.TOPBAR_HEIGHT if self.hud_visible else 0
+        bottom_margin = self.BOTTOMBAR_HEIGHT if self.hud_visible else 0
+        left = self.PANEL_WIDTH if self.left_panel_visible else 0
+        right = self.PANEL_WIDTH if self.right_panel_visible else 0
+
+        return pygame.Rect(
+            left,
+            top,
+            self.window_width - left - right,
+            self.window_height - top - bottom_margin
+        )
+
     def _render_world(self) -> None:
         """Render world view as background."""
         # Get transform (uses helper from Task 3.4, or calculate inline for now)
@@ -677,8 +699,8 @@ class CockpitApp:
             # Inline calculation (will be replaced by helper in Task 3.4)
             left = self.PANEL_WIDTH if self.left_panel_visible else 0
             right = self.window_width - (self.PANEL_WIDTH if self.right_panel_visible else 0)
-            top = self.TOPBAR_HEIGHT
-            bottom = self.window_height - self.BOTTOMBAR_HEIGHT
+            top = self.TOPBAR_HEIGHT if self.hud_visible else 0
+            bottom = self.window_height - (self.BOTTOMBAR_HEIGHT if self.hud_visible else 0)
             world_rect = pygame.Rect(left, top, right - left, bottom - top)
             scale_x = world_rect.width / self.simulation.world.width
             scale_y = world_rect.height / self.simulation.world.height
@@ -1769,9 +1791,10 @@ class CockpitApp:
         # Render world (background)
         self._render_world()
 
-        # Render HUD bars
-        self._render_topbar()
-        self._render_bottombar()
+        # Render HUD bars (if visible)
+        if self.hud_visible:
+            self._render_topbar()
+            self._render_bottombar()
 
         # Render side panels
         self._render_left_panel()
