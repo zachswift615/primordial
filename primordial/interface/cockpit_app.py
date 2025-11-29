@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any, List
 from primordial.simulation.simulation import Simulation
 from primordial.simulation.config import SimulationConfig
 from primordial.simulation.agent_database import AgentDatabase
+from primordial.interface.audio_capture import AudioCapture
 
 
 class CockpitApp:
@@ -95,6 +96,19 @@ class CockpitApp:
 
         # Agent database
         self.agent_db = AgentDatabase()
+
+        # Audio capture (with graceful fallback if mic unavailable)
+        try:
+            self.audio_capture = AudioCapture(
+                sample_rate=44100,
+                channels=1,
+                buffer_size=2048
+            )
+            self.audio_enabled = True
+        except Exception as e:
+            print(f"Warning: Audio capture unavailable: {e}")
+            self.audio_capture = None
+            self.audio_enabled = False
 
         # Teaching stats
         self.stats = {
@@ -268,6 +282,15 @@ class CockpitApp:
         if not self.paused:
             scaled_dt = dt * self.time_scale
             self.simulation.tick(scaled_dt)
+
+        # Push-to-talk: SPACE unmutes microphone (only if audio enabled)
+        if self.audio_enabled:
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_SPACE]:
+                self.audio_capture.unmute()
+                self._inject_microphone_sound()
+            else:
+                self.audio_capture.mute()
 
         self.ui_manager.update(dt)
 
@@ -911,6 +934,33 @@ class CockpitApp:
                 return wrapper
         return None
 
+    def _inject_microphone_sound(self) -> None:
+        """Inject microphone as sound source at selected agent."""
+        from primordial.world.sound.sound_source import SoundSource
+        import numpy as np
+
+        wrapper = self._get_target_agent_wrapper()
+        if wrapper is None:
+            return
+
+        audio = self.audio_capture.get_recent(1024)
+        if len(audio) == 0:
+            return
+
+        rms = np.sqrt(np.mean(audio ** 2))
+        intensity = min(1.0, rms * 5.0)
+
+        if intensity < 0.01:
+            return
+
+        source = SoundSource(
+            position=wrapper.agent.position.copy(),
+            frequency=300.0,
+            intensity=intensity,
+            is_active=True,
+        )
+        self.simulation.world.sound_system.add_source(source)
+
     def _save_selected_agent(self) -> None:
         """Save selected agent to database."""
         wrapper = self._get_target_agent_wrapper()
@@ -1152,6 +1202,9 @@ class CockpitApp:
         self.running = True
         self._auto_load_agents()  # Load on start
 
+        if self.audio_enabled:
+            self.audio_capture.start()
+
         while self.running:
             dt = self.clock.tick(60) / 1000.0
 
@@ -1164,6 +1217,8 @@ class CockpitApp:
     def cleanup(self) -> None:
         """Cleanup resources."""
         self._auto_save_agents()  # Save on exit
+        if self.audio_enabled and self.audio_capture:
+            self.audio_capture.stop()
         pygame.quit()
 
 
