@@ -29,6 +29,7 @@ class AgentRecord:
     notes: str
     genome_json: str
     model_path: str
+    is_favorite: int = 0  # 1 if favorited, 0 otherwise
 
 
 class AgentDatabase:
@@ -76,9 +77,16 @@ class AgentDatabase:
                 saved_at REAL,
                 notes TEXT DEFAULT '',
                 genome_json TEXT,
-                model_path TEXT
+                model_path TEXT,
+                is_favorite INTEGER DEFAULT 0
             )
         ''')
+
+        # Add is_favorite column if it doesn't exist (migration for existing DBs)
+        try:
+            cursor.execute('ALTER TABLE agents ADD COLUMN is_favorite INTEGER DEFAULT 0')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
         # Create index for common queries
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_longest_life ON agents(longest_life DESC)')
@@ -89,13 +97,16 @@ class AgentDatabase:
         conn.commit()
         conn.close()
 
-    def save_agent(self, wrapper, name: str = None, notes: str = "") -> int:
+    def save_agent(self, wrapper, name: str = None, notes: str = "", db_id: int = None) -> int:
         """Save an agent to the database.
+
+        If db_id is provided, updates the existing record instead of creating new.
 
         Args:
             wrapper: AgentWrapper instance to save.
             name: Optional name for the agent. Defaults to agent_id.
             notes: Optional notes about this agent.
+            db_id: If provided, update this existing record instead of creating new.
 
         Returns:
             Database ID of the saved agent.
@@ -108,16 +119,50 @@ class AgentDatabase:
         # Serialize genome
         genome_json = json.dumps(wrapper.agent.genome.to_dict())
 
-        # Save model weights
-        model_filename = f"model_{int(time.time())}_{wrapper.agent_id}.pt"
-        model_path = str(self.models_dir / model_filename)
-        torch.save(wrapper.model.state_dict(), model_path)
-
         # Get stats
         stats = wrapper.lifetime_stats
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
+
+        if db_id is not None:
+            # Update existing record
+            existing = self.get_agent(db_id)
+            if existing:
+                # Update model weights in same file
+                model_path = existing.model_path
+                torch.save(wrapper.model.state_dict(), model_path)
+
+                cursor.execute('''
+                    UPDATE agents SET
+                        name = ?, generation = ?, total_food_eaten = ?, times_bred = ?,
+                        offspring_count = ?, deaths = ?, total_time_alive = ?,
+                        longest_life = ?, damage_taken = ?, saved_at = ?,
+                        notes = ?, genome_json = ?
+                    WHERE id = ?
+                ''', (
+                    name,
+                    wrapper.generation,
+                    stats['total_food_eaten'],
+                    stats['times_bred'],
+                    stats['offspring_count'],
+                    stats['deaths'],
+                    stats['total_time_alive'],
+                    stats['longest_life'],
+                    stats['damage_taken'],
+                    time.time(),
+                    notes or existing.notes,
+                    genome_json,
+                    db_id
+                ))
+                conn.commit()
+                conn.close()
+                return db_id
+
+        # Create new record
+        model_filename = f"model_{int(time.time())}_{wrapper.agent_id}.pt"
+        model_path = str(self.models_dir / model_filename)
+        torch.save(wrapper.model.state_dict(), model_path)
 
         cursor.execute('''
             INSERT INTO agents (
@@ -255,6 +300,7 @@ class AgentDatabase:
                 model=wrapper.model,
                 optimizer_config=optimizer_config,
                 reward_config=reward_config,
+                agent_id=wrapper.agent_id,
             )
 
         # Reset sensing state to avoid stale references
@@ -274,6 +320,9 @@ class AgentDatabase:
             'damage_taken': record.damage_taken,
             'created_at': record.created_at,
         }
+
+        # Track database ID so we can update instead of create new
+        wrapper.db_id = record.id
 
         return True
 
@@ -301,6 +350,103 @@ class AgentDatabase:
         conn.close()
 
         return True
+
+    def toggle_favorite(self, agent_id: int) -> bool:
+        """Toggle favorite status for an agent.
+
+        Args:
+            agent_id: Database ID of the agent.
+
+        Returns:
+            New favorite status (True if now favorited).
+        """
+        record = self.get_agent(agent_id)
+        if record is None:
+            return False
+
+        new_status = 0 if record.is_favorite else 1
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('UPDATE agents SET is_favorite = ? WHERE id = ?', (new_status, agent_id))
+        conn.commit()
+        conn.close()
+
+        return new_status == 1
+
+    def set_favorite(self, agent_id: int, is_favorite: bool) -> bool:
+        """Set favorite status for an agent.
+
+        Args:
+            agent_id: Database ID of the agent.
+            is_favorite: Whether to mark as favorite.
+
+        Returns:
+            True if successful.
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('UPDATE agents SET is_favorite = ? WHERE id = ?',
+                      (1 if is_favorite else 0, agent_id))
+        affected = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return affected > 0
+
+    def get_favorites(self) -> List[AgentRecord]:
+        """Get all favorited agents.
+
+        Returns:
+            List of favorite AgentRecord objects.
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM agents WHERE is_favorite = 1 ORDER BY saved_at DESC')
+        rows = cursor.fetchall()
+        conn.close()
+        return [AgentRecord(*row) for row in rows]
+
+    def cleanup_duplicates(self, keep_top_n: int = 10, keep_favorites: bool = True) -> Dict[str, int]:
+        """Remove duplicate/old agents, keeping only the best.
+
+        This helps prevent database bloat from auto-saving.
+
+        Args:
+            keep_top_n: Number of top agents to keep (by fitness score).
+            keep_favorites: If True, always keep favorited agents.
+
+        Returns:
+            Dict with cleanup stats (deleted_count, kept_count, etc).
+        """
+        # Get all agents
+        all_agents = self.list_agents(order_by='saved_at', limit=10000)
+        if not all_agents:
+            return {'deleted_count': 0, 'kept_count': 0}
+
+        # Get best agents by fitness
+        best_agents = self.get_best_agents(limit=keep_top_n)
+        best_ids = {a.id for a in best_agents}
+
+        # Get favorites
+        favorites = self.get_favorites() if keep_favorites else []
+        favorite_ids = {a.id for a in favorites}
+
+        # IDs to keep
+        keep_ids = best_ids | favorite_ids
+
+        # Delete the rest
+        deleted_count = 0
+        for agent in all_agents:
+            if agent.id not in keep_ids:
+                if self.delete_agent(agent.id):
+                    deleted_count += 1
+
+        return {
+            'deleted_count': deleted_count,
+            'kept_count': len(keep_ids),
+            'favorites_kept': len(favorite_ids),
+            'top_performers_kept': len(best_ids),
+        }
 
     def search_agents(self, query: str) -> List[AgentRecord]:
         """Search agents by name or notes.
@@ -372,13 +518,14 @@ class AgentDatabase:
             return "No agents found."
 
         lines = [
-            f"{'ID':>4} | {'Name':<25} | {'Gen':>4} | {'Food':>5} | {'Bred':>4} | {'Kids':>4} | {'Longest':>8} | {'Deaths':>6}",
-            "-" * 90
+            f"{'ID':>4} | {'★':>1} | {'Name':<23} | {'Gen':>4} | {'Food':>5} | {'Bred':>4} | {'Kids':>4} | {'Longest':>8} | {'Deaths':>6}",
+            "-" * 95
         ]
 
         for a in agents:
+            fav = "★" if a.is_favorite else " "
             lines.append(
-                f"{a.id:>4} | {a.name[:25]:<25} | {a.generation:>4} | "
+                f"{a.id:>4} | {fav:>1} | {a.name[:23]:<23} | {a.generation:>4} | "
                 f"{a.total_food_eaten:>5} | {a.times_bred:>4} | {a.offspring_count:>4} | "
                 f"{a.longest_life:>7.1f}s | {a.deaths:>6}"
             )
@@ -387,6 +534,8 @@ class AgentDatabase:
 
     def get_best_agents(self, limit: int = 10) -> List[AgentRecord]:
         """Get the best agents ranked by composite fitness score.
+
+        Favorites are always included first, then filled with top performers.
 
         Fitness score combines:
         - Total time alive (40% weight) - survival ability
@@ -398,7 +547,7 @@ class AgentDatabase:
             limit: Maximum number of agents to return.
 
         Returns:
-            List of AgentRecord objects sorted by fitness.
+            List of AgentRecord objects sorted by fitness (favorites first).
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -427,9 +576,21 @@ class AgentDatabase:
             gen_score = (agent.generation / max_gen) * 0.1
             return time_score + offspring_score + food_score + gen_score
 
-        # Sort by fitness and return top N
-        agents.sort(key=fitness_score, reverse=True)
-        return agents[:limit]
+        # Separate favorites and non-favorites
+        favorites = [a for a in agents if a.is_favorite]
+        non_favorites = [a for a in agents if not a.is_favorite]
+
+        # Sort each group by fitness
+        favorites.sort(key=fitness_score, reverse=True)
+        non_favorites.sort(key=fitness_score, reverse=True)
+
+        # Favorites first, then fill remaining slots with top performers
+        result = favorites[:limit]
+        remaining_slots = limit - len(result)
+        if remaining_slots > 0:
+            result.extend(non_favorites[:remaining_slots])
+
+        return result
 
     def auto_load_best_agents(self, simulation, count: int = None) -> int:
         """Automatically load the best agents into a simulation.

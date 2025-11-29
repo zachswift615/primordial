@@ -32,6 +32,7 @@ class OnlineLearningLoop:
         reward_config: Optional[Dict[str, Any]] = None,
         stability_config: Optional[Dict[str, Any]] = None,
         death_config: Optional[Dict[str, Any]] = None,
+        agent_id: Optional[str] = None,
     ):
         """
         Initialize online learning loop.
@@ -43,8 +44,10 @@ class OnlineLearningLoop:
             reward_config: Reward system configuration (optional)
             stability_config: Stability measures configuration (optional)
             death_config: Death handling configuration (optional)
+            agent_id: Unique identifier for this agent (for per-agent checkpoints)
         """
         self.model = model
+        self.agent_id = agent_id or "unknown"
 
         # Use defaults if not provided
         loss_config = loss_config or {}
@@ -179,16 +182,23 @@ class OnlineLearningLoop:
         """
         Handle agent death.
 
-        Saves checkpoint, optionally resets optimizer state, and reduces learning rate.
+        Saves checkpoint (only keeps latest per agent), optionally resets
+        optimizer state, and reduces learning rate.
 
         Returns:
             Dict with death count and checkpoint path
         """
         self.death_count += 1
 
-        # 1. Save checkpoint
-        checkpoint_path = self.checkpoint_dir / f'death_{self.death_count}.pt'
+        # 1. Save checkpoint - only keep latest per agent
+        # Delete old checkpoint for this agent if it exists
+        old_checkpoint = self.checkpoint_dir / f'{self.agent_id}_latest.pt'
+        if old_checkpoint.exists():
+            old_checkpoint.unlink()
+
+        checkpoint_path = self.checkpoint_dir / f'{self.agent_id}_latest.pt'
         torch.save({
+            'agent_id': self.agent_id,
             'death_count': self.death_count,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.base_optimizer.state_dict(),

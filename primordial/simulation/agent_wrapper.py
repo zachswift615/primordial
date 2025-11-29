@@ -54,6 +54,9 @@ class AgentWrapper:
         self.food_eaten = 0
         self.generation = 0
 
+        # Database tracking - if loaded from DB, this is the record ID
+        self.db_id: Optional[int] = None
+
         # Lifetime stats (persist across respawns for lineage tracking)
         self.lifetime_stats = {
             'total_food_eaten': 0,
@@ -101,6 +104,7 @@ class AgentWrapper:
                 model=self.model,
                 optimizer_config=optimizer_config,
                 reward_config=reward_config,
+                agent_id=agent_id,
             )
         else:
             self.learning_loop = None

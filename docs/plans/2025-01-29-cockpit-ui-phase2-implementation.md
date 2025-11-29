@@ -12,6 +12,64 @@
 
 ---
 
+## Pre-Implementation Setup
+
+### Task 0: Add Required Imports and Color Constants
+
+**Files:**
+- Modify: `primordial/interface/cockpit_app.py`
+
+**Step 1: Add all required imports at file top**
+
+After existing imports, add:
+```python
+import json
+import math
+from pathlib import Path
+from datetime import datetime
+from typing import Dict, Optional
+
+from primordial.agents.genome import AgentGenome
+from primordial.learning.rewards import SurvivalRewards
+```
+
+**Step 2: Add color constants to __init__**
+
+Add after existing color definitions (or create color section if not present):
+```python
+# UI Colors
+self.CYAN = (0, 255, 255)
+self.CYAN_DIM = (0, 150, 150)
+self.GREEN = (0, 200, 100)
+self.GREEN_DIM = (0, 100, 50)
+self.BG_DARKEST = (20, 20, 28)
+self.BG_DARK = (28, 28, 36)
+self.BG_PANEL = (32, 32, 42)
+self.TEXT_BRIGHT = (255, 255, 255)
+self.TEXT_NORMAL = (200, 200, 210)
+self.TEXT_DIM = (120, 120, 140)
+```
+
+**Step 3: Add user data directory helper**
+
+```python
+# User data directory for saves
+self.user_data_dir = Path.home() / ".primordial"
+self.user_data_dir.mkdir(exist_ok=True)
+self.maps_dir = self.user_data_dir / "maps"
+self.maps_dir.mkdir(exist_ok=True)
+self.presets_file = self.user_data_dir / "custom_presets.json"
+```
+
+**Step 4: Commit setup changes**
+
+```bash
+git add primordial/interface/cockpit_app.py
+git commit -m "chore: add imports and constants for Phase 2 UI"
+```
+
+---
+
 ## Phase 1: Remaining Control Tabs (Tasks 1-5)
 
 ### Task 1: Implement Agents Tab (Default Genome Sliders)
@@ -84,7 +142,7 @@ else:
 
 **Step 3: Add genome slider interaction handling**
 
-Add to MOUSEBUTTONDOWN slider section (around line 215), after the existing slider keys list:
+In the MOUSEBUTTONDOWN event handler, after existing slider collision checks, add:
 ```python
 # Genome sliders (Agents tab)
 if self.left_panel_visible and self.left_panel_tab == "agents":
@@ -101,21 +159,44 @@ if self.left_panel_visible and self.left_panel_tab == "agents":
 
 **Step 4: Add genome slider value application**
 
-Add to MOUSEMOTION handler (around line 235), add genome slider handling:
+In the MOUSEMOTION handler where other sliders are processed, add genome slider handling.
+This code calculates the value from mouse position and applies it:
+
 ```python
-# Apply genome slider values
+# Handle genome slider dragging
 if self.active_slider and self.active_slider.startswith("genome_"):
-    attr_name = self.active_slider.replace("genome_", "")
-    if hasattr(self.default_genome, attr_name):
-        setattr(self.default_genome, attr_name, new_val)
+    # Find the slider rect and range for this key
+    slider_rect = getattr(self, f"slider_{self.active_slider}_rect", None)
+    if slider_rect:
+        # Get min/max from slider metadata (stored during _render_slider)
+        slider_meta = getattr(self, f"slider_{self.active_slider}_meta", None)
+        if slider_meta:
+            min_val, max_val = slider_meta
+            # Calculate value from mouse position
+            rel_x = max(0, min(event.pos[0] - slider_rect.x, slider_rect.width))
+            pct = rel_x / slider_rect.width
+            new_val = min_val + pct * (max_val - min_val)
+
+            # Apply to default genome
+            attr_name = self.active_slider.replace("genome_", "")
+            if hasattr(self.default_genome, attr_name):
+                setattr(self.default_genome, attr_name, new_val)
 ```
 
-**Step 5: Test Agents tab**
+**Step 5: Update _render_slider to store metadata**
+
+The `_render_slider` method needs to store min/max values for later use. Add at end of method:
+```python
+# Store slider metadata for interaction
+setattr(self, f"slider_{key}_meta", (min_val, max_val))
+```
+
+**Step 6: Test Agents tab**
 
 Run: `python -m primordial.interface.cockpit_app`
 Expected: Click "Agents" tab, sliders for genome parameters appear, dragging updates default_genome
 
-**Step 6: Commit**
+**Step 7: Commit**
 
 ```bash
 git add primordial/interface/cockpit_app.py
@@ -501,7 +582,7 @@ self.presets = {
     "Chaos": {"max_agents": 15, "predator_count": 6, "initial_food": 100},
 }
 self.current_preset = "Normal"
-self.custom_presets_file = Path(__file__).parent / "custom_presets.json"
+# Use user data directory instead of source directory
 self._load_custom_presets()
 ```
 
@@ -510,10 +591,9 @@ self._load_custom_presets()
 ```python
 def _load_custom_presets(self) -> None:
     """Load custom presets from file."""
-    import json
-    if self.custom_presets_file.exists():
+    if self.presets_file.exists():
         try:
-            with open(self.custom_presets_file) as f:
+            with open(self.presets_file) as f:
                 custom = json.load(f)
                 self.presets.update(custom)
         except Exception as e:
@@ -521,7 +601,6 @@ def _load_custom_presets(self) -> None:
 
 def _save_current_as_preset(self, name: str) -> None:
     """Save current configuration as a preset."""
-    import json
     preset = {
         "max_agents": self.control_values["max_agents"],
         "predator_count": self.control_values["predator_count"],
@@ -534,9 +613,12 @@ def _save_current_as_preset(self, name: str) -> None:
     # Save custom presets (excluding built-ins)
     custom = {k: v for k, v in self.presets.items()
               if k not in ["Easy", "Normal", "Hard", "Chaos"]}
-    with open(self.custom_presets_file, 'w') as f:
-        json.dump(custom, f, indent=2)
-    print(f"Saved preset: {name}")
+    try:
+        with open(self.presets_file, 'w') as f:
+            json.dump(custom, f, indent=2)
+        print(f"Saved preset: {name}")
+    except Exception as e:
+        print(f"Error saving preset: {e}")
 
 def _apply_preset(self, name: str) -> None:
     """Apply a preset to current configuration."""
@@ -812,6 +894,14 @@ self.tracking_agent_id: Optional[str] = None
 
 **Step 2: Add action buttons to _render_selected_agent_detail**
 
+**Note on emoji buttons:** The code below uses emoji symbols for button labels. If emojis don't render properly in your pygame font, replace them with ASCII equivalents:
+- `👁` → `[o]` or `Eye`
+- `✏` → `[E]` or `Edit`
+- `💉` → `[+]` or `Heal`
+- `🔄` → `[R]` or `Resp`
+- `💾` → `[S]` or `Save`
+- `📂` → `[D]` or `Load`
+
 After the status bars, add:
 ```python
 y += 8
@@ -964,9 +1054,9 @@ git commit -m "feat: add agent action buttons (track, edit, heal, respawn)"
 
 **Step 1: Update table columns in _render_agent_table**
 
-Update columns list:
+Update columns list. Note: If emojis don't render, use `"Fd"` and `"Ch"` (for Food/Children) instead:
 ```python
-# Column headers
+# Column headers (use Fd/Ch if emojis don't render)
 cols = ["#", "E", "H", "Age", "Gen", "🍖", "👶"]
 col_widths = [22, 32, 32, 40, 32, 32, 32]
 ```
@@ -1089,8 +1179,8 @@ def _render_help_modal(self) -> None:
         ("AGENT CONTROL", [
             ("1-9", "Select Agent"),
             ("T", "Heal Selected"),
-            ("C", "Control Mode"),
-            ("↑↓←→", "Move (in control)"),
+            ("C", "Control Mode On/Off"),
+            ("Arrows", "Move (in ctrl mode)"),
         ]),
         ("SAVE/LOAD", [
             ("S", "Save Agent"),
@@ -1101,8 +1191,9 @@ def _render_help_modal(self) -> None:
         ]),
         ("PANELS", [
             ("TAB", "Toggle Left Panel"),
-            ("Shift+TAB", "Toggle Right Panel"),
-            ("H", "Toggle HUD"),
+            ("Shift+TAB", "Toggle Right"),
+            ("Shift+H", "Toggle HUD"),
+            ("H/?", "This Help"),
             ("ESC", "Close Modal/Quit"),
         ]),
     ]
@@ -1203,6 +1294,7 @@ git commit -m "feat: implement help overlay modal with keyboard shortcuts"
 
 ```python
 # Database browser state
+self.DB_AGENTS_PER_PAGE = 8  # Constant for pagination
 self.db_page = 0
 self.db_selected_id = None
 self.db_search_text = ""
@@ -1263,9 +1355,8 @@ def _render_database_browser(self) -> None:
 
     # Agent list
     self.db_row_rects = []
-    agents_per_page = 8
-    start_idx = self.db_page * agents_per_page
-    page_agents = self.db_agents_cache[start_idx:start_idx + agents_per_page]
+    start_idx = self.db_page * self.DB_AGENTS_PER_PAGE
+    page_agents = self.db_agents_cache[start_idx:start_idx + self.DB_AGENTS_PER_PAGE]
 
     # Table header
     pygame.draw.rect(self.screen, self.BG_DARK, pygame.Rect(modal_x + 12, y, modal_w - 24, 22))
@@ -1321,7 +1412,7 @@ def _render_database_browser(self) -> None:
 
     # Pagination
     y += 8
-    total_pages = max(1, (len(self.db_agents_cache) + agents_per_page - 1) // agents_per_page)
+    total_pages = max(1, (len(self.db_agents_cache) + self.DB_AGENTS_PER_PAGE - 1) // self.DB_AGENTS_PER_PAGE)
     page_text = self.font_small.render(f"Page {self.db_page + 1} of {total_pages}", True, self.TEXT_DIM)
     self.screen.blit(page_text, (modal_x + modal_w // 2 - 50, y))
 
@@ -1380,7 +1471,7 @@ if self.database_browser_open:
             self.db_page -= 1
         return
     if hasattr(self, 'db_next_rect') and self.db_next_rect.collidepoint(mouse_pos):
-        total_pages = max(1, (len(self.db_agents_cache) + 7) // 8)
+        total_pages = max(1, (len(self.db_agents_cache) + self.DB_AGENTS_PER_PAGE - 1) // self.DB_AGENTS_PER_PAGE)
         if self.db_page < total_pages - 1:
             self.db_page += 1
         return
@@ -1553,6 +1644,7 @@ def _render_genome_editor(self) -> None:
     }
 
     self.ge_slider_rects = {}
+    self.ge_reset_rects = {}
     for param, label, min_v, max_v, default in tab_params.get(self.genome_editor_tab, []):
         value = self.genome_editor_values.get(param, default)
 
@@ -1592,6 +1684,8 @@ def _render_genome_editor(self) -> None:
         pygame.draw.rect(self.screen, (60, 60, 70), reset_rect, border_radius=3)
         reset_text = self.font_small.render("↺", True, self.TEXT_DIM)
         self.screen.blit(reset_text, (reset_rect.x + 2, reset_rect.y))
+        # Store reset button rect for click handling
+        self.ge_reset_rects[param] = (reset_rect, default)
 
         y += 32
 
@@ -1633,6 +1727,13 @@ if self.genome_editor_open:
     if hasattr(self, 'ge_apply_rect') and self.ge_apply_rect.collidepoint(mouse_pos):
         self._apply_genome_changes()
         return
+
+    # Reset button clicks
+    if hasattr(self, 'ge_reset_rects'):
+        for param, (rect, default) in self.ge_reset_rects.items():
+            if rect.collidepoint(mouse_pos):
+                self.genome_editor_values[param] = default
+                return
 
     # Slider interaction
     if hasattr(self, 'ge_slider_rects'):
@@ -1726,6 +1827,8 @@ elif event.key == pygame.K_c:
 
 **Step 3: Add arrow key handling in _update**
 
+Add this near the start of `_update(self, dt: float)` method, where `dt` is the delta time passed by the main loop:
+
 ```python
 # Control mode - arrow keys move selected agent
 if self.control_mode and not self.paused:
@@ -1746,15 +1849,28 @@ if self.control_mode and not self.paused:
 
         # Apply forces directly
         if thrust != 0 or torque != 0:
-            import math
             agent = wrapper.agent
+            # Ensure agent has required attributes
+            thrust_force = getattr(agent.genome, 'thrust_force', 500.0)
+            torque_force = getattr(agent.genome, 'torque_force', 1000.0)
+            mass = getattr(agent.genome, 'mass', 1.0)
+            max_speed = getattr(agent.genome, 'max_speed', 200.0)
+
             # Thrust in facing direction
-            fx = math.cos(agent.angle) * thrust * agent.genome.thrust_force * dt
-            fy = math.sin(agent.angle) * thrust * agent.genome.thrust_force * dt
-            agent.velocity.x += fx / agent.genome.mass
-            agent.velocity.y += fy / agent.genome.mass
+            fx = math.cos(agent.angle) * thrust * thrust_force * dt
+            fy = math.sin(agent.angle) * thrust * thrust_force * dt
+            agent.velocity.x += fx / mass
+            agent.velocity.y += fy / mass
+
+            # Clamp velocity to max speed
+            speed = math.sqrt(agent.velocity.x**2 + agent.velocity.y**2)
+            if speed > max_speed:
+                scale = max_speed / speed
+                agent.velocity.x *= scale
+                agent.velocity.y *= scale
+
             # Torque
-            agent.angular_velocity += torque * agent.genome.torque_force * dt / 100
+            agent.angular_velocity += torque * torque_force * dt / 100
 ```
 
 **Step 4: Add control mode indicator to top bar**
@@ -1828,11 +1944,24 @@ if self.hud_visible:
 
 **Step 4: Update layout calculations**
 
-In `_get_world_transform`:
+In `_get_world_rect` (or equivalent method that calculates the world view area), update to account for HUD visibility:
 ```python
-top = self.TOPBAR_HEIGHT if self.hud_visible else 0
-bottom = self.window_height - (self.BOTTOMBAR_HEIGHT if self.hud_visible else 0)
+def _get_world_rect(self) -> pygame.Rect:
+    """Get the screen rectangle for the world view, accounting for panels and HUD."""
+    top = self.TOPBAR_HEIGHT if self.hud_visible else 0
+    bottom_margin = self.BOTTOMBAR_HEIGHT if self.hud_visible else 0
+    left = self.PANEL_WIDTH if self.left_panel_visible else 0
+    right = self.PANEL_WIDTH if self.right_panel_visible else 0
+
+    return pygame.Rect(
+        left,
+        top,
+        self.window_width - left - right,
+        self.window_height - top - bottom_margin
+    )
 ```
+
+If this method doesn't exist, add it and update any code that calculates the world view area to use it.
 
 **Step 5: Test HUD toggle**
 
@@ -1858,9 +1987,6 @@ git commit -m "feat: implement HUD toggle with Shift+H"
 ```python
 def _save_map(self) -> None:
     """Save current world state to file."""
-    import json
-    from datetime import datetime
-
     map_data = {
         'timestamp': datetime.now().isoformat(),
         'world_width': self.simulation.world.width,
@@ -1888,33 +2014,37 @@ def _save_map(self) -> None:
         ],
     }
 
-    maps_dir = Path(__file__).parent / "maps"
-    maps_dir.mkdir(exist_ok=True)
-    filename = maps_dir / f"map_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    # Use user data directory (set up in Task 0)
+    filename = self.maps_dir / f"map_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 
-    with open(filename, 'w') as f:
-        json.dump(map_data, f, indent=2)
-
-    print(f"Saved map to {filename}")
+    try:
+        with open(filename, 'w') as f:
+            json.dump(map_data, f, indent=2)
+        print(f"Saved map to {filename}")
+    except Exception as e:
+        print(f"Error saving map: {e}")
 
 def _load_map(self) -> None:
     """Load most recent map file."""
-    import json
     from primordial.world.entities import Food, Vegetation, Water, Predator
     from primordial.world.geometry import Vec2
 
-    maps_dir = Path(__file__).parent / "maps"
-    if not maps_dir.exists():
+    # Use user data directory (set up in Task 0)
+    if not self.maps_dir.exists():
         print("No maps directory found")
         return
 
-    map_files = sorted(maps_dir.glob("map_*.json"), reverse=True)
+    map_files = sorted(self.maps_dir.glob("map_*.json"), reverse=True)
     if not map_files:
         print("No map files found")
         return
 
-    with open(map_files[0]) as f:
-        map_data = json.load(f)
+    try:
+        with open(map_files[0]) as f:
+            map_data = json.load(f)
+    except Exception as e:
+        print(f"Error loading map: {e}")
+        return
 
     # Clear existing entities (except agents)
     self.simulation.world.food_items.clear()

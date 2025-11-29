@@ -1,4 +1,4 @@
-# Session Handoff: Human Interface Complete + Integration Plan Ready
+# Session Handoff: Cockpit UI Design & Implementation Plan
 
 **Created:** 2025-11-28
 **Purpose:** Enable continuation in a fresh context with complete precision
@@ -6,152 +6,138 @@
 ---
 
 <original_task>
-Continue the Primordial implementation. Previous sessions completed:
-1. LRN Architecture (185 tests)
-2. World System (275 tests)
-3. Agent Body (83 tests)
-4. Rust Performance (6 tests)
-5. Learning System (61 tests)
-
-This session completed:
-6. Human Interface (41 tests)
-7. Created Integration & Experiments plan
+Design and plan a comprehensive pygame-gui based "cockpit" interface for the Primordial simulation. User requirements:
+- Beautiful sci-fi/neon themed UI achievable with pygame-gui
+- Control over nearly every aspect of agents and world (stat depletion rates, reward contributions, predator reproduction, food/water stat boosts, social HP reduction, etc.)
+- Live updating agent table with 10 rows, scrollable, with ability to select and load agents from database
+- HTML/CSS mockup first, then implementation plan for converting to pygame-gui
 </original_task>
 
 <work_completed>
-## Human Interface - COMPLETE (10 commits, 41 tests)
+## Design Exploration (Brainstorming Skill)
+- Gathered requirements through structured questions
+- User preferences established:
+  - **Use case**: All-purpose (research, education, rapid prototyping)
+  - **Apply mode**: Live/real-time changes
+  - **Organization**: Tabbed panels
+  - **Style**: Sci-fi/Neon with **opaque panels** (user explicitly rejected semi-transparency)
+  - **Resolution**: Flexible/resizable
 
-### Components Implemented
-| File | Purpose | Tests |
-|------|---------|-------|
-| `interface/config.py` | UI configuration, colors, layout, keybindings | 3 |
-| `interface/teaching_signals.py` | Reward/punishment/point/demo signal system | 7 |
-| `interface/audio_capture.py` | Background microphone capture with circular buffer | 5 |
-| `interface/input_handler.py` | Unified keyboard/mouse/controller input | 6 |
-| `interface/demo_mode.py` | Human-controls-agent demonstration mode | 6 |
-| `interface/ui_panels.py` | Header, WorldView, AgentPOV, Status, Metrics, Waveform, Controls | 4 |
-| `interface/renderer.py` | Main rendering engine with panel management | 3 |
-| `interface/app.py` | Main application loop with event processing | 3 |
-| `tests/interface/test_integration.py` | End-to-end integration tests | 4 |
-| `__main__.py` | CLI entry point | - |
+## Architecture Decision
+- Evaluated 3 layout approaches:
+  - A: Command Center (fixed panels)
+  - B: Mission Control (three-column)
+  - C: Cockpit (full-screen world with overlay panels) - **SELECTED**
+- Cockpit layout chosen for maximum world view visibility and collapsible panels
 
-### Key Features
-- **Multi-panel UI**: World view (top-down), Agent POV (first-person), Status, Metrics, Waveform, Controls
-- **Teaching signals**: SPACE=Reward, X=Punish, Click=Point, Arrows=Demo movement
-- **Audio capture**: Real-time microphone with circular buffer
-- **Controller support**: Game controller with analog sticks
-- **State persistence**: Save/load agent state
+## Design Document Created
+**File**: `docs/plans/2025-01-28-cockpit-ui-design.md`
+- Complete color palette (CSS variables)
+- Component specifications for all 7 UI elements
+- pygame-gui widget mapping
+- Keyboard shortcuts reference
+- All design decisions documented
 
-### Run Command
-```bash
-python -m primordial interface
-# or simply
-python -m primordial
-```
+## HTML/CSS Mockup Created
+**File**: `docs/mockups/primordial-ui-mockup.html`
+- Fully interactive mockup with:
+  - HUD top bar (FPS, speed, day/night, gen, population)
+  - Left control panel with 6 tabs (World, Agents, Learn, Rewards, Predators, Presets)
+  - Right agent panel with 10-row table and selected agent detail
+  - HUD bottom bar (teaching buttons, audio visualizer, system controls)
+  - Database browser modal
+  - Genome editor modal
+  - Help/keyboard shortcuts modal
+- All styling matches sci-fi/neon theme
+- Tab switching, row selection, modal open/close all functional
 
-## Integration Plan Created
+## Implementation Plan Created & Refined
+**File**: `docs/plans/2025-01-28-cockpit-ui-implementation.md`
 
-Created comprehensive plan at `primordial/plans/06-integration-and-experiments.md`:
-
-### 10 Tasks in Plan
-1. Simulation Configuration
-2. Agent Wrapper (combines Body + LRN + LearningLoop)
-3. Main Simulation Class
-4. Metrics Collector
-5. Base Experiment Class
-6. Survival Baseline Experiment (Learning ON vs OFF)
-7. Teaching Impact Experiment
-8. CLI for Running Experiments
-9. Update Package Exports
-10. Full Pipeline Integration Test
-
-### Success Criteria from Master Plan
-| Criterion | Target | Experiment |
-|-----------|--------|------------|
-| Survival improvement with learning | >5x | `survival_baseline.py` |
-| Teaching acceleration | >2x | `teaching_impact.py` |
-| Forward pass latency | <10ms | Manual profiling |
-| Frame rate | 60 FPS | Interface FPS counter |
-| Catastrophic forgetting | None over 1 hour | Long-run metrics |
+Plan reviewed twice by superpowers:code-reviewer agent. Issues identified and fixed:
+- MVP scope clearly defined (Phase 1-5 vs Phase 6-7 future)
+- pygame-gui usage clarified (modals only, raw pygame for main UI)
+- `_rebuild_layout()` fully implemented (Task 3.4)
+- Resize handler added (pygame.VIDEORESIZE)
+- `_get_world_transform()` helper extracts duplicate code (DRY fix)
+- `_screen_to_world()` uses the helper
+- Task 5.2 broken into 5 subtasks (5.2-5.6) with complete code
+- Race condition fixed with early return on table click
+- Config validation with hasattr() check before setattr()
+- Audio error handling with graceful fallback
+- Theme.json error handling with defaults fallback
 </work_completed>
 
 <current_state>
-## Test Suite
-```
-651 tests passing (118.83s)
-- world: 275 tests
-- lrn: 185 tests
-- agents: 83 tests
-- learning: 61 tests
-- interface: 41 tests
-- rust: 6 tests
-```
+## Deliverables Status
+| Deliverable | Status | Location |
+|-------------|--------|----------|
+| Design document | Complete | `docs/plans/2025-01-28-cockpit-ui-design.md` |
+| HTML/CSS mockup | Complete | `docs/mockups/primordial-ui-mockup.html` |
+| Implementation plan | Complete | `docs/plans/2025-01-28-cockpit-ui-implementation.md` |
+| CockpitApp implementation | Not started | `primordial/interface/cockpit_app.py` |
+| theme.json | Not started | `primordial/interface/theme.json` |
+| pygame-gui in requirements | Not started | `requirements.txt` |
 
-## Files Modified This Session
-```
-primordial/interface/
-├── __init__.py (exports)
-├── config.py
-├── teaching_signals.py
-├── audio_capture.py
-├── input_handler.py
-├── demo_mode.py
-├── ui_panels.py
-├── renderer.py
-└── app.py
+## Plan Structure
+17 tasks across 5 MVP phases + 2 future phases:
 
-primordial/__main__.py (CLI entry)
-primordial/plans/06-integration-and-experiments.md
-```
-
-## Git Status
-```
-Branch: main
-Commits this session: 12
-All changes pushed to origin
-```
+**Phase 1: Setup and Core Layout** (Tasks 1.1-1.3)
+**Phase 2: HUD Bars** (Tasks 2.1-2.2)
+**Phase 3: Side Panels** (Tasks 3.1-3.4)
+**Phase 4: Agent Selection** (Task 4.1)
+**Phase 5: Migration and Integration** (Tasks 5.1-5.6)
+**Phase 6-7: Future** (Modals, remaining tabs)
 </current_state>
 
 <next_steps>
-## Recommended: Execute Integration Plan
-
-The next step is to execute `primordial/plans/06-integration-and-experiments.md`.
+## Execute the Implementation Plan
 
 ### Quick Start
-```bash
-# Open plan and execute
-cat primordial/plans/06-integration-and-experiments.md | head -50
+```
+Read these files:
+1. docs/plans/2025-01-28-cockpit-ui-implementation.md (the plan)
+2. docs/plans/2025-01-28-cockpit-ui-design.md (design decisions)
+3. docs/mockups/primordial-ui-mockup.html (open in browser for visual reference)
 ```
 
-### Use Skill
-```
-Use superpowers:executing-plans to implement primordial/plans/06-integration-and-experiments.md
-```
+### Execution Options
+1. **Use executing-plans skill**:
+   ```
+   Use superpowers:executing-plans to implement docs/plans/2025-01-28-cockpit-ui-implementation.md
+   ```
 
-### What Gets Built
-1. **Simulation module** - Orchestrates World + AgentBody + LRN + LearningLoop
-2. **Experiments** - Automated experiments to validate success criteria
-3. **CLI** - `python -m primordial experiment survival`
+2. **Use subagent-driven-development skill**:
+   ```
+   Use superpowers:subagent-driven-development
+   ```
 
-### After Integration
-Once integration is complete:
-1. Run experiments to validate success criteria
-2. Tune hyperparameters based on results
-3. Iterate on learning system if criteria not met
+### First Task
+Task 1.1: Install pygame-gui and create theme.json
+- Add `pygame-gui>=0.6.0` to requirements.txt
+- Create `primordial/interface/theme.json` with sci-fi color palette
 </next_steps>
 
 <gotchas>
-## Dependencies
-- `pygame` and `sounddevice` already installed
-- All 651 tests passing
+## Critical Technical Notes
 
-## Interface Notes
-- Audio capture requires microphone permissions on macOS
-- Controller support auto-detects connected gamepads
-- Pygame warning about deprecated pkg_resources (safe to ignore)
+1. **Opaque panels** - User explicitly rejected semi-transparency for readability
 
-## LRN Model
-- Input shapes: vision(32,4), audio(100,2), proprio(7), touch(8)
-- Output: predictions(343), reward_preds(5), actions(5)
-- ~800K parameters
+2. **pygame-gui is for modals only** - Main UI uses raw pygame drawing for performance
+
+3. **`_get_world_transform()` helper** - Returns `(world_rect, scale, offset_x, offset_y)` tuple, used by both rendering and input
+
+4. **Click handler race condition** - Table clicks must be checked FIRST with early return before world clicks
+
+5. **Shift+P precedence** - Must check Shift+P (spawn predator) BEFORE regular P (pause)
+
+6. **Audio capture fallback** - Wrapped in try/catch with `audio_enabled` flag for graceful degradation
+
+7. **Config validation** - Use hasattr() before setattr() when applying slider values
+
+## Files to Reference
+- Existing interface: `primordial/interface/integrated_app.py`
+- Existing renderer: `primordial/interface/renderer.py`
+- Existing config: `primordial/interface/config.py`
+- Agent database: `primordial/simulation/agent_database.py`
 </gotchas>

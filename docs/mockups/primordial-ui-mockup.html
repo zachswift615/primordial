@@ -1,0 +1,2170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Primordial - Simulation Control Interface</title>
+    <style>
+        /* ============================================
+           CSS VARIABLES - Sci-Fi/Neon Theme
+           ============================================ */
+        :root {
+            /* Background colors */
+            --bg-darkest: #0a0a12;
+            --bg-dark: #12121a;
+            --bg-panel: #1a1a24;
+            --bg-input: #252530;
+            --bg-hover: #2a2a38;
+
+            /* Accent colors */
+            --cyan: #00ffff;
+            --cyan-dim: #00aaaa;
+            --cyan-glow: rgba(0, 255, 255, 0.3);
+            --green: #00ff88;
+            --green-dim: #00aa66;
+            --red: #ff4466;
+            --red-dim: #aa3344;
+            --yellow: #ffaa00;
+            --purple: #aa66ff;
+            --pink: #ff66aa;
+
+            /* Text colors */
+            --text-bright: #ffffff;
+            --text-normal: #ccccdd;
+            --text-dim: #888899;
+            --text-disabled: #555566;
+
+            /* Status colors */
+            --energy-color: #ffaa00;
+            --health-color: #00ff88;
+            --breed-color: #ff66aa;
+            --social-color: #aa66ff;
+
+            /* Sizing */
+            --panel-width: 280px;
+            --topbar-height: 44px;
+            --bottombar-height: 50px;
+            --border-radius: 4px;
+
+            /* Fonts */
+            --font-main: 'Segoe UI', 'Roboto', sans-serif;
+            --font-mono: 'Consolas', 'Monaco', monospace;
+        }
+
+        /* ============================================
+           RESET & BASE
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-main);
+            font-size: 13px;
+            color: var(--text-normal);
+            background: var(--bg-darkest);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* ============================================
+           MAIN LAYOUT
+           ============================================ */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* ============================================
+           HUD TOP BAR
+           ============================================ */
+        .topbar {
+            height: var(--topbar-height);
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--cyan-dim);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 20px;
+            z-index: 100;
+        }
+
+        .topbar-logo {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .topbar-logo::before {
+            content: "🎮";
+        }
+
+        .topbar-divider {
+            width: 1px;
+            height: 24px;
+            background: var(--bg-hover);
+        }
+
+        .topbar-stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+
+        .topbar-stat-label {
+            color: var(--text-dim);
+        }
+
+        .topbar-stat-value {
+            color: var(--text-bright);
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .speed-btn {
+            width: 24px;
+            height: 24px;
+            background: var(--bg-input);
+            border: 1px solid var(--cyan-dim);
+            border-radius: var(--border-radius);
+            color: var(--cyan);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+
+        .speed-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--cyan);
+        }
+
+        .speed-value {
+            min-width: 50px;
+            text-align: center;
+            font-family: var(--font-mono);
+            color: var(--cyan);
+            font-weight: bold;
+        }
+
+        .day-night-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: var(--bg-input);
+            border-radius: var(--border-radius);
+        }
+
+        .day-night-indicator.night {
+            color: var(--purple);
+        }
+
+        .day-night-indicator.day {
+            color: var(--yellow);
+        }
+
+        .topbar-spacer {
+            flex: 1;
+        }
+
+        .settings-btn {
+            width: 32px;
+            height: 32px;
+            background: var(--bg-input);
+            border: 1px solid var(--text-dim);
+            border-radius: var(--border-radius);
+            color: var(--text-normal);
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .settings-btn:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        /* ============================================
+           WORLD VIEW (Center)
+           ============================================ */
+        .world-view {
+            flex: 1;
+            background: var(--bg-darkest);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .world-canvas {
+            width: 100%;
+            height: 100%;
+            background:
+                linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+                var(--bg-darkest);
+            background-size: 50px 50px;
+        }
+
+        .world-entity {
+            position: absolute;
+            border-radius: 50%;
+        }
+
+        .entity-agent {
+            width: 16px;
+            height: 16px;
+            background: #64c8ff;
+            border: 2px solid white;
+            box-shadow: 0 0 10px rgba(100, 200, 255, 0.5);
+        }
+
+        .entity-food {
+            width: 8px;
+            height: 8px;
+            background: var(--green);
+            box-shadow: 0 0 6px rgba(0, 255, 136, 0.5);
+        }
+
+        .entity-predator {
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 18px solid var(--red);
+            border-radius: 0;
+            filter: drop-shadow(0 0 6px rgba(255, 68, 102, 0.5));
+        }
+
+        .entity-water {
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle, #3264b4 0%, #1a3a6a 100%);
+            opacity: 0.8;
+        }
+
+        .entity-vegetation {
+            width: 30px;
+            height: 30px;
+            background: #1e5020;
+            border-radius: 40% 60% 50% 70%;
+        }
+
+        /* ============================================
+           LEFT CONTROL PANEL
+           ============================================ */
+        .left-panel {
+            width: var(--panel-width);
+            background: var(--bg-panel);
+            border-right: 1px solid var(--cyan-dim);
+            display: flex;
+            flex-direction: column;
+            z-index: 50;
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--cyan-dim);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-weight: bold;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 12px;
+        }
+
+        .panel-collapse-btn {
+            width: 24px;
+            height: 24px;
+            background: none;
+            border: 1px solid var(--text-dim);
+            border-radius: var(--border-radius);
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .panel-collapse-btn:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .panel-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 8px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .panel-tab {
+            padding: 6px 10px;
+            background: var(--bg-input);
+            border: 1px solid transparent;
+            border-radius: var(--border-radius);
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        .panel-tab:hover {
+            background: var(--bg-hover);
+            color: var(--text-normal);
+        }
+
+        .panel-tab.active {
+            background: var(--bg-hover);
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        .control-section {
+            margin-bottom: 16px;
+        }
+
+        .section-header {
+            font-size: 11px;
+            font-weight: bold;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .control-row {
+            margin-bottom: 12px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+
+        .control-name {
+            color: var(--text-normal);
+        }
+
+        .control-default {
+            color: var(--text-dim);
+            font-size: 10px;
+        }
+
+        .control-slider-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 6px;
+            background: var(--bg-input);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .control-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--cyan);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 6px var(--cyan-glow);
+        }
+
+        .control-slider::-webkit-slider-thumb:hover {
+            background: var(--text-bright);
+        }
+
+        .control-input {
+            width: 55px;
+            padding: 4px 6px;
+            background: var(--bg-input);
+            border: 1px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            color: var(--text-bright);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            text-align: right;
+        }
+
+        .control-input:focus {
+            border-color: var(--cyan);
+            outline: none;
+        }
+
+        .control-reset-btn {
+            width: 20px;
+            height: 20px;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .control-reset-btn:hover {
+            color: var(--cyan);
+        }
+
+        .panel-footer {
+            padding: 12px;
+            background: var(--bg-dark);
+            border-top: 1px solid var(--bg-hover);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .preset-select {
+            width: 100%;
+            padding: 8px 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            color: var(--text-normal);
+            cursor: pointer;
+        }
+
+        .preset-select:focus {
+            border-color: var(--cyan);
+            outline: none;
+        }
+
+        .panel-footer-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--cyan-dim);
+            border: 1px solid var(--cyan);
+            color: var(--bg-darkest);
+        }
+
+        .btn-primary:hover {
+            background: var(--cyan);
+        }
+
+        .btn-secondary {
+            background: var(--bg-input);
+            border: 1px solid var(--text-dim);
+            color: var(--text-normal);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        /* ============================================
+           RIGHT AGENT PANEL
+           ============================================ */
+        .right-panel {
+            width: var(--panel-width);
+            background: var(--bg-panel);
+            border-left: 1px solid var(--cyan-dim);
+            display: flex;
+            flex-direction: column;
+            z-index: 50;
+        }
+
+        .agent-table-container {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .agent-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .agent-table th {
+            background: var(--bg-dark);
+            padding: 8px 4px;
+            text-align: center;
+            font-weight: bold;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-size: 10px;
+            border-bottom: 1px solid var(--bg-hover);
+            position: sticky;
+            top: 0;
+            cursor: pointer;
+        }
+
+        .agent-table th:hover {
+            color: var(--cyan);
+        }
+
+        .agent-table-body {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .agent-table td {
+            padding: 6px 4px;
+            text-align: center;
+            border-bottom: 1px solid var(--bg-hover);
+            font-family: var(--font-mono);
+        }
+
+        .agent-table tr {
+            cursor: pointer;
+        }
+
+        .agent-table tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .agent-table tr.selected {
+            background: var(--bg-hover);
+        }
+
+        .agent-table tr.selected td:first-child {
+            border-left: 3px solid var(--cyan);
+        }
+
+        .agent-table tr.dead {
+            opacity: 0.5;
+        }
+
+        .agent-table tr.dead td {
+            color: var(--text-disabled);
+        }
+
+        .table-controls {
+            display: flex;
+            gap: 8px;
+            padding: 8px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .table-select {
+            flex: 1;
+            padding: 4px 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            color: var(--text-normal);
+            font-size: 11px;
+        }
+
+        .selected-agent-section {
+            background: var(--bg-dark);
+            border-top: 1px solid var(--cyan-dim);
+        }
+
+        .selected-agent-header {
+            padding: 10px 12px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .selected-agent-title {
+            font-weight: bold;
+            color: var(--cyan);
+            font-size: 12px;
+        }
+
+        .selected-agent-content {
+            padding: 12px;
+        }
+
+        .status-bar {
+            margin-bottom: 8px;
+        }
+
+        .status-bar-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+            font-size: 11px;
+        }
+
+        .status-bar-label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-bar-value {
+            color: var(--text-bright);
+            font-family: var(--font-mono);
+        }
+
+        .status-bar-track {
+            height: 8px;
+            background: var(--bg-input);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .status-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        .status-bar-fill.energy {
+            background: linear-gradient(90deg, var(--energy-color), #ffcc44);
+        }
+
+        .status-bar-fill.health {
+            background: linear-gradient(90deg, var(--health-color), #66ffaa);
+        }
+
+        .status-bar-fill.breed {
+            background: linear-gradient(90deg, var(--breed-color), #ff99cc);
+        }
+
+        .status-bar-fill.social {
+            background: linear-gradient(90deg, var(--social-color), #cc99ff);
+        }
+
+        .agent-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin: 12px 0;
+            font-size: 11px;
+        }
+
+        .agent-info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 8px;
+            background: var(--bg-input);
+            border-radius: var(--border-radius);
+        }
+
+        .agent-info-label {
+            color: var(--text-dim);
+        }
+
+        .agent-info-value {
+            color: var(--text-bright);
+            font-family: var(--font-mono);
+        }
+
+        .agent-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .agent-action-btn {
+            padding: 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            color: var(--text-normal);
+            cursor: pointer;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .agent-action-btn:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .agent-action-btn.primary {
+            background: var(--cyan-dim);
+            border-color: var(--cyan);
+            color: var(--bg-darkest);
+        }
+
+        .agent-action-btn.primary:hover {
+            background: var(--cyan);
+        }
+
+        /* ============================================
+           HUD BOTTOM BAR
+           ============================================ */
+        .bottombar {
+            height: var(--bottombar-height);
+            background: var(--bg-dark);
+            border-top: 1px solid var(--cyan-dim);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 20px;
+            z-index: 100;
+        }
+
+        .teaching-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .teaching-btn {
+            padding: 8px 16px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .teaching-btn.reward {
+            background: var(--green-dim);
+            border: 2px solid var(--green);
+            color: var(--bg-darkest);
+        }
+
+        .teaching-btn.reward:hover {
+            background: var(--green);
+            box-shadow: 0 0 12px rgba(0, 255, 136, 0.4);
+        }
+
+        .teaching-btn.punish {
+            background: var(--red-dim);
+            border: 2px solid var(--red);
+            color: var(--bg-darkest);
+        }
+
+        .teaching-btn.punish:hover {
+            background: var(--red);
+            box-shadow: 0 0 12px rgba(255, 68, 102, 0.4);
+        }
+
+        .shortcut-hint {
+            font-size: 10px;
+            opacity: 0.7;
+            padding: 2px 4px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 2px;
+        }
+
+        .audio-visualizer {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-input);
+            border-radius: var(--border-radius);
+        }
+
+        .audio-icon {
+            font-size: 14px;
+        }
+
+        .audio-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 20px;
+        }
+
+        .audio-bar {
+            width: 4px;
+            background: var(--cyan);
+            border-radius: 2px;
+            animation: audio-pulse 0.5s ease-in-out infinite alternate;
+        }
+
+        .audio-bar:nth-child(1) { height: 4px; animation-delay: 0s; }
+        .audio-bar:nth-child(2) { height: 8px; animation-delay: 0.1s; }
+        .audio-bar:nth-child(3) { height: 14px; animation-delay: 0.2s; }
+        .audio-bar:nth-child(4) { height: 20px; animation-delay: 0.3s; }
+        .audio-bar:nth-child(5) { height: 12px; animation-delay: 0.4s; }
+        .audio-bar:nth-child(6) { height: 6px; animation-delay: 0.5s; }
+        .audio-bar:nth-child(7) { height: 10px; animation-delay: 0.6s; }
+        .audio-bar:nth-child(8) { height: 4px; animation-delay: 0.7s; }
+
+        @keyframes audio-pulse {
+            from { opacity: 0.5; }
+            to { opacity: 1; }
+        }
+
+        .bottombar-spacer {
+            flex: 1;
+        }
+
+        .system-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .system-btn {
+            padding: 8px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            color: var(--text-normal);
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .system-btn:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .system-btn.recording {
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .system-btn.recording:hover {
+            background: var(--red-dim);
+        }
+
+        /* ============================================
+           MODAL STYLES
+           ============================================ */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.hidden {
+            display: none;
+        }
+
+        .modal {
+            background: var(--bg-panel);
+            border: 1px solid var(--cyan-dim);
+            border-radius: 8px;
+            max-width: 90vw;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.2);
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--cyan-dim);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            background: none;
+            border: 1px solid var(--text-dim);
+            border-radius: var(--border-radius);
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .modal-close:hover {
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .modal-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .modal-footer {
+            padding: 16px 20px;
+            background: var(--bg-dark);
+            border-top: 1px solid var(--bg-hover);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            border-radius: 0 0 8px 8px;
+        }
+
+        /* Database Modal Specific */
+        .database-modal {
+            width: 700px;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            color: var(--text-bright);
+            font-size: 13px;
+        }
+
+        .search-input:focus {
+            border-color: var(--cyan);
+            outline: none;
+        }
+
+        .search-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .checkbox-label:hover {
+            border-color: var(--cyan);
+        }
+
+        .db-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+
+        .db-table th {
+            background: var(--bg-dark);
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: bold;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-size: 10px;
+            border-bottom: 1px solid var(--cyan-dim);
+            cursor: pointer;
+        }
+
+        .db-table th:hover {
+            color: var(--cyan);
+        }
+
+        .db-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--bg-hover);
+            font-size: 12px;
+        }
+
+        .db-table tr {
+            cursor: pointer;
+        }
+
+        .db-table tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .db-table tr.selected {
+            background: var(--bg-hover);
+            outline: 1px solid var(--cyan);
+        }
+
+        .db-table .favorite {
+            color: var(--yellow);
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .pagination-btn {
+            width: 28px;
+            height: 28px;
+            background: var(--bg-input);
+            border: 1px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            color: var(--text-normal);
+            cursor: pointer;
+        }
+
+        .pagination-btn:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .preview-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--bg-hover);
+        }
+
+        .preview-title {
+            font-weight: bold;
+            color: var(--cyan);
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+
+        .preview-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .preview-column h4 {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .preview-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 12px;
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .preview-item-label {
+            color: var(--text-dim);
+        }
+
+        .preview-item-value {
+            color: var(--text-bright);
+            font-family: var(--font-mono);
+        }
+
+        .notes-input {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--bg-hover);
+            border-radius: var(--border-radius);
+            color: var(--text-normal);
+            font-size: 12px;
+            resize: none;
+            margin-top: 12px;
+        }
+
+        .notes-input:focus {
+            border-color: var(--cyan);
+            outline: none;
+        }
+
+        .modal-footer-left {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+        }
+
+        /* Genome Editor Modal */
+        .genome-modal {
+            width: 600px;
+        }
+
+        .genome-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+
+        .genome-tab {
+            padding: 8px 14px;
+            background: var(--bg-input);
+            border: 1px solid transparent;
+            border-radius: var(--border-radius);
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .genome-tab:hover {
+            background: var(--bg-hover);
+            color: var(--text-normal);
+        }
+
+        .genome-tab.active {
+            background: var(--bg-hover);
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .genome-controls {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+
+        .genome-control {
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .genome-control:last-child {
+            border-bottom: none;
+        }
+
+        .genome-control-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .genome-control-name {
+            color: var(--text-normal);
+            font-size: 13px;
+        }
+
+        .genome-control-default {
+            color: var(--text-dim);
+            font-size: 11px;
+        }
+
+        .genome-control-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .genome-range {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-top: 4px;
+        }
+
+        /* Help Modal */
+        .help-modal {
+            width: 650px;
+        }
+
+        .shortcuts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .shortcut-section h3 {
+            font-size: 12px;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 12px;
+        }
+
+        .shortcut-key {
+            font-family: var(--font-mono);
+            color: var(--cyan);
+            background: var(--bg-input);
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+
+        .shortcut-action {
+            color: var(--text-normal);
+        }
+
+        /* ============================================
+           SCROLLBAR STYLES
+           ============================================ */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-hover);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--cyan-dim);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- HUD Top Bar -->
+        <header class="topbar">
+            <div class="topbar-logo">PRIMORDIAL</div>
+            <div class="topbar-divider"></div>
+            <div class="topbar-stat">
+                <span class="topbar-stat-label">FPS:</span>
+                <span class="topbar-stat-value">60</span>
+            </div>
+            <div class="topbar-divider"></div>
+            <div class="speed-control">
+                <button class="speed-btn">◀</button>
+                <span class="speed-value">1.0x</span>
+                <button class="speed-btn">▶</button>
+            </div>
+            <div class="topbar-divider"></div>
+            <div class="day-night-indicator night">
+                <span>🌙</span>
+                <span>Night</span>
+            </div>
+            <div class="topbar-divider"></div>
+            <div class="topbar-stat">
+                <span class="topbar-stat-label">Gen:</span>
+                <span class="topbar-stat-value">4</span>
+            </div>
+            <div class="topbar-divider"></div>
+            <div class="topbar-stat">
+                <span class="topbar-stat-label">Pop:</span>
+                <span class="topbar-stat-value">5/5</span>
+            </div>
+            <div class="topbar-spacer"></div>
+            <button class="settings-btn">⚙</button>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Left Control Panel -->
+            <aside class="left-panel">
+                <div class="panel-header">
+                    <span class="panel-title">Controls</span>
+                    <button class="panel-collapse-btn">◀</button>
+                </div>
+                <div class="panel-tabs">
+                    <button class="panel-tab active">World</button>
+                    <button class="panel-tab">Agents</button>
+                    <button class="panel-tab">Learn</button>
+                    <button class="panel-tab">Rewards</button>
+                    <button class="panel-tab">Predators</button>
+                    <button class="panel-tab">Presets</button>
+                </div>
+                <div class="panel-content">
+                    <div class="control-section">
+                        <div class="section-header">Population</div>
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span class="control-name">Max Agents</span>
+                                <span class="control-default">Default: 5</span>
+                            </div>
+                            <div class="control-slider-row">
+                                <input type="range" class="control-slider" min="1" max="20" value="5">
+                                <input type="text" class="control-input" value="5">
+                                <button class="control-reset-btn">↺</button>
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span class="control-name">Initial Food</span>
+                                <span class="control-default">Default: 50</span>
+                            </div>
+                            <div class="control-slider-row">
+                                <input type="range" class="control-slider" min="10" max="200" value="50">
+                                <input type="text" class="control-input" value="50">
+                                <button class="control-reset-btn">↺</button>
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span class="control-name">Max Food</span>
+                                <span class="control-default">Default: 100</span>
+                            </div>
+                            <div class="control-slider-row">
+                                <input type="range" class="control-slider" min="20" max="500" value="100">
+                                <input type="text" class="control-input" value="100">
+                                <button class="control-reset-btn">↺</button>
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span class="control-name">Predator Count</span>
+                                <span class="control-default">Default: 2</span>
+                            </div>
+                            <div class="control-slider-row">
+                                <input type="range" class="control-slider" min="0" max="10" value="2">
+                                <input type="text" class="control-input" value="2">
+                                <button class="control-reset-btn">↺</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="control-section">
+                        <div class="section-header">Environment</div>
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span class="control-name">World Width</span>
+                                <span class="control-default">Default: 1000</span>
+                            </div>
+                            <div class="control-slider-row">
+                                <input type="range" class="control-slider" min="500" max="3000" value="1000">
+                                <input type="text" class="control-input" value="1000">
+                                <button class="control-reset-btn">↺</button>
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span class="control-name">World Height</span>
+                                <span class="control-default">Default: 1000</span>
+                            </div>
+                            <div class="control-slider-row">
+                                <input type="range" class="control-slider" min="500" max="3000" value="1000">
+                                <input type="text" class="control-input" value="1000">
+                                <button class="control-reset-btn">↺</button>
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span class="control-name">Tick Rate</span>
+                                <span class="control-default">Default: 60</span>
+                            </div>
+                            <div class="control-slider-row">
+                                <input type="range" class="control-slider" min="15" max="120" value="60">
+                                <input type="text" class="control-input" value="60">
+                                <button class="control-reset-btn">↺</button>
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span class="control-name">Vegetation Clusters</span>
+                                <span class="control-default">Default: 8</span>
+                            </div>
+                            <div class="control-slider-row">
+                                <input type="range" class="control-slider" min="0" max="20" value="8">
+                                <input type="text" class="control-input" value="8">
+                                <button class="control-reset-btn">↺</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="control-section">
+                        <div class="section-header">Day/Night Cycle</div>
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span class="control-name">Day Length (sec)</span>
+                                <span class="control-default">Default: 120</span>
+                            </div>
+                            <div class="control-slider-row">
+                                <input type="range" class="control-slider" min="30" max="600" value="120">
+                                <input type="text" class="control-input" value="120">
+                                <button class="control-reset-btn">↺</button>
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span class="control-name">Min Brightness</span>
+                                <span class="control-default">Default: 0.1</span>
+                            </div>
+                            <div class="control-slider-row">
+                                <input type="range" class="control-slider" min="0" max="1" step="0.05" value="0.1">
+                                <input type="text" class="control-input" value="0.10">
+                                <button class="control-reset-btn">↺</button>
+                            </div>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span class="control-name">Max Brightness</span>
+                                <span class="control-default">Default: 0.5</span>
+                            </div>
+                            <div class="control-slider-row">
+                                <input type="range" class="control-slider" min="0" max="1" step="0.05" value="0.5">
+                                <input type="text" class="control-input" value="0.50">
+                                <button class="control-reset-btn">↺</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-footer">
+                    <select class="preset-select">
+                        <option>Presets ▼</option>
+                        <option>Easy Mode</option>
+                        <option>Hard Mode</option>
+                        <option>Chaos Mode</option>
+                        <option>No Predators</option>
+                        <option>Fast Evolution</option>
+                    </select>
+                    <div class="panel-footer-buttons">
+                        <button class="btn btn-secondary">Save</button>
+                        <button class="btn btn-primary">Load</button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- World View -->
+            <div class="world-view">
+                <div class="world-canvas">
+                    <!-- Entities would be rendered here by pygame -->
+                    <div class="world-entity entity-agent" style="left: 30%; top: 40%;"></div>
+                    <div class="world-entity entity-agent" style="left: 50%; top: 30%;"></div>
+                    <div class="world-entity entity-agent" style="left: 60%; top: 60%;"></div>
+                    <div class="world-entity entity-agent" style="left: 35%; top: 70%;"></div>
+                    <div class="world-entity entity-agent" style="left: 70%; top: 45%;"></div>
+                    <div class="world-entity entity-food" style="left: 25%; top: 25%;"></div>
+                    <div class="world-entity entity-food" style="left: 45%; top: 55%;"></div>
+                    <div class="world-entity entity-food" style="left: 65%; top: 35%;"></div>
+                    <div class="world-entity entity-food" style="left: 75%; top: 65%;"></div>
+                    <div class="world-entity entity-food" style="left: 40%; top: 80%;"></div>
+                    <div class="world-entity entity-predator" style="left: 20%; top: 50%;"></div>
+                    <div class="world-entity entity-predator" style="left: 80%; top: 30%;"></div>
+                    <div class="world-entity entity-water" style="left: 15%; top: 15%;"></div>
+                    <div class="world-entity entity-water" style="left: 85%; top: 80%;"></div>
+                    <div class="world-entity entity-vegetation" style="left: 55%; top: 20%;"></div>
+                    <div class="world-entity entity-vegetation" style="left: 25%; top: 60%;"></div>
+                    <div class="world-entity entity-vegetation" style="left: 75%; top: 50%;"></div>
+                </div>
+            </div>
+
+            <!-- Right Agent Panel -->
+            <aside class="right-panel">
+                <div class="panel-header">
+                    <span class="panel-title">Agents</span>
+                    <button class="panel-collapse-btn">▶</button>
+                </div>
+                <div class="agent-table-container">
+                    <table class="agent-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>⚡</th>
+                                <th>❤</th>
+                                <th>Age</th>
+                                <th>🧬</th>
+                                <th>🍖</th>
+                                <th>👶</th>
+                            </tr>
+                        </thead>
+                    </table>
+                    <div class="agent-table-body">
+                        <table class="agent-table">
+                            <tbody>
+                                <tr class="selected">
+                                    <td>1</td>
+                                    <td>78%</td>
+                                    <td>100</td>
+                                    <td>45s</td>
+                                    <td>4</td>
+                                    <td>3</td>
+                                    <td>1</td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td>92%</td>
+                                    <td>85</td>
+                                    <td>32s</td>
+                                    <td>3</td>
+                                    <td>5</td>
+                                    <td>2</td>
+                                </tr>
+                                <tr>
+                                    <td>3</td>
+                                    <td>45%</td>
+                                    <td>100</td>
+                                    <td>18s</td>
+                                    <td>5</td>
+                                    <td>1</td>
+                                    <td>0</td>
+                                </tr>
+                                <tr class="dead">
+                                    <td>4</td>
+                                    <td>--</td>
+                                    <td>DEAD</td>
+                                    <td>--</td>
+                                    <td>2</td>
+                                    <td>8</td>
+                                    <td>4</td>
+                                </tr>
+                                <tr>
+                                    <td>5</td>
+                                    <td>61%</td>
+                                    <td>72</td>
+                                    <td>67s</td>
+                                    <td>4</td>
+                                    <td>2</td>
+                                    <td>1</td>
+                                </tr>
+                                <tr><td colspan="7" style="color: var(--text-disabled);">—</td></tr>
+                                <tr><td colspan="7" style="color: var(--text-disabled);">—</td></tr>
+                                <tr><td colspan="7" style="color: var(--text-disabled);">—</td></tr>
+                                <tr><td colspan="7" style="color: var(--text-disabled);">—</td></tr>
+                                <tr><td colspan="7" style="color: var(--text-disabled);">—</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="table-controls">
+                    <select class="table-select">
+                        <option>Sort: Age ▼</option>
+                        <option>Sort: Energy</option>
+                        <option>Sort: Generation</option>
+                        <option>Sort: Food Eaten</option>
+                    </select>
+                    <select class="table-select">
+                        <option>Filter: All</option>
+                        <option>Alive Only</option>
+                        <option>Dead Only</option>
+                        <option>Male Only</option>
+                        <option>Female Only</option>
+                    </select>
+                </div>
+                <div class="selected-agent-section">
+                    <div class="selected-agent-header">
+                        <span class="selected-agent-title">Selected: Agent #1</span>
+                    </div>
+                    <div class="selected-agent-content">
+                        <div class="status-bar">
+                            <div class="status-bar-header">
+                                <span class="status-bar-label">⚡ Energy</span>
+                                <span class="status-bar-value">78%</span>
+                            </div>
+                            <div class="status-bar-track">
+                                <div class="status-bar-fill energy" style="width: 78%;"></div>
+                            </div>
+                        </div>
+                        <div class="status-bar">
+                            <div class="status-bar-header">
+                                <span class="status-bar-label">❤ Health</span>
+                                <span class="status-bar-value">100%</span>
+                            </div>
+                            <div class="status-bar-track">
+                                <div class="status-bar-fill health" style="width: 100%;"></div>
+                            </div>
+                        </div>
+                        <div class="status-bar">
+                            <div class="status-bar-header">
+                                <span class="status-bar-label">💕 Breed</span>
+                                <span class="status-bar-value">32%</span>
+                            </div>
+                            <div class="status-bar-track">
+                                <div class="status-bar-fill breed" style="width: 32%;"></div>
+                            </div>
+                        </div>
+                        <div class="status-bar">
+                            <div class="status-bar-header">
+                                <span class="status-bar-label">👥 Social</span>
+                                <span class="status-bar-value">54%</span>
+                            </div>
+                            <div class="status-bar-track">
+                                <div class="status-bar-fill social" style="width: 54%;"></div>
+                            </div>
+                        </div>
+                        <div class="agent-info-grid">
+                            <div class="agent-info-item">
+                                <span class="agent-info-label">Age</span>
+                                <span class="agent-info-value">45.2s</span>
+                            </div>
+                            <div class="agent-info-item">
+                                <span class="agent-info-label">Gender</span>
+                                <span class="agent-info-value">♀</span>
+                            </div>
+                            <div class="agent-info-item">
+                                <span class="agent-info-label">Gen</span>
+                                <span class="agent-info-value">4</span>
+                            </div>
+                            <div class="agent-info-item">
+                                <span class="agent-info-label">Food</span>
+                                <span class="agent-info-value">3</span>
+                            </div>
+                            <div class="agent-info-item">
+                                <span class="agent-info-label">Offspring</span>
+                                <span class="agent-info-value">1</span>
+                            </div>
+                            <div class="agent-info-item">
+                                <span class="agent-info-label">Deaths</span>
+                                <span class="agent-info-value">0</span>
+                            </div>
+                        </div>
+                        <div class="agent-actions">
+                            <button class="agent-action-btn">👁 Track</button>
+                            <button class="agent-action-btn" onclick="openGenomeModal()">✏ Edit</button>
+                            <button class="agent-action-btn">💉 Heal</button>
+                            <button class="agent-action-btn">🔄 Respawn</button>
+                            <button class="agent-action-btn">💾 Save</button>
+                            <button class="agent-action-btn primary" onclick="openDatabaseModal()">📂 Load DB</button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <!-- HUD Bottom Bar -->
+        <footer class="bottombar">
+            <div class="teaching-buttons">
+                <button class="teaching-btn reward">
+                    🏆 REWARD
+                    <span class="shortcut-hint">R</span>
+                </button>
+                <button class="teaching-btn punish">
+                    ❌ PUNISH
+                    <span class="shortcut-hint">X</span>
+                </button>
+            </div>
+            <div class="audio-visualizer">
+                <span class="audio-icon">🎤</span>
+                <div class="audio-bars">
+                    <div class="audio-bar"></div>
+                    <div class="audio-bar"></div>
+                    <div class="audio-bar"></div>
+                    <div class="audio-bar"></div>
+                    <div class="audio-bar"></div>
+                    <div class="audio-bar"></div>
+                    <div class="audio-bar"></div>
+                    <div class="audio-bar"></div>
+                </div>
+            </div>
+            <div class="bottombar-spacer"></div>
+            <div class="system-buttons">
+                <button class="system-btn">⏸ Pause</button>
+                <button class="system-btn">📹 Rec</button>
+                <button class="system-btn" onclick="openHelpModal()">? Help</button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Database Browser Modal -->
+    <div class="modal-overlay hidden" id="database-modal">
+        <div class="modal database-modal">
+            <div class="modal-header">
+                <span class="modal-title">Agent Database</span>
+                <button class="modal-close" onclick="closeDatabaseModal()">✕</button>
+            </div>
+            <div class="modal-content">
+                <div class="search-row">
+                    <input type="text" class="search-input" placeholder="🔍 Search by name...">
+                    <label class="checkbox-label">
+                        <input type="checkbox"> ⭐ Favorites Only
+                    </label>
+                </div>
+                <table class="db-table">
+                    <thead>
+                        <tr>
+                            <th>⭐</th>
+                            <th>Name</th>
+                            <th>Gen</th>
+                            <th>Lifespan</th>
+                            <th>Food</th>
+                            <th>Offspring</th>
+                            <th>Saved</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="selected">
+                            <td class="favorite">★</td>
+                            <td>Alpha Prime</td>
+                            <td>8</td>
+                            <td>342s</td>
+                            <td>47</td>
+                            <td>12</td>
+                            <td>2hr ago</td>
+                        </tr>
+                        <tr>
+                            <td>☆</td>
+                            <td>Survivor-7</td>
+                            <td>6</td>
+                            <td>256s</td>
+                            <td>31</td>
+                            <td>8</td>
+                            <td>1d ago</td>
+                        </tr>
+                        <tr>
+                            <td class="favorite">★</td>
+                            <td>OG-Hunter</td>
+                            <td>4</td>
+                            <td>189s</td>
+                            <td>22</td>
+                            <td>5</td>
+                            <td>3d ago</td>
+                        </tr>
+                        <tr>
+                            <td>☆</td>
+                            <td>Rookie-12</td>
+                            <td>2</td>
+                            <td>67s</td>
+                            <td>4</td>
+                            <td>0</td>
+                            <td>5d ago</td>
+                        </tr>
+                        <tr>
+                            <td>☆</td>
+                            <td>Test-Agent</td>
+                            <td>1</td>
+                            <td>23s</td>
+                            <td>1</td>
+                            <td>0</td>
+                            <td>1w ago</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="pagination">
+                    <span>Page 1 of 3</span>
+                    <button class="pagination-btn">◀</button>
+                    <button class="pagination-btn">▶</button>
+                </div>
+                <div class="preview-section">
+                    <div class="preview-title">Selected: Alpha Prime</div>
+                    <div class="preview-grid">
+                        <div class="preview-column">
+                            <h4>Genome Preview</h4>
+                            <div class="preview-item">
+                                <span class="preview-item-label">Max Speed</span>
+                                <span class="preview-item-value">165.2</span>
+                            </div>
+                            <div class="preview-item">
+                                <span class="preview-item-label">Vision Range</span>
+                                <span class="preview-item-value">215.0</span>
+                            </div>
+                            <div class="preview-item">
+                                <span class="preview-item-label">Energy Efficiency</span>
+                                <span class="preview-item-value">0.85</span>
+                            </div>
+                            <div class="preview-item">
+                                <span class="preview-item-label">Hearing Range</span>
+                                <span class="preview-item-value">320.0</span>
+                            </div>
+                        </div>
+                        <div class="preview-column">
+                            <h4>Lifetime Stats</h4>
+                            <div class="preview-item">
+                                <span class="preview-item-label">Total Time</span>
+                                <span class="preview-item-value">1,247s</span>
+                            </div>
+                            <div class="preview-item">
+                                <span class="preview-item-label">Total Food</span>
+                                <span class="preview-item-value">142</span>
+                            </div>
+                            <div class="preview-item">
+                                <span class="preview-item-label">Times Bred</span>
+                                <span class="preview-item-value">28</span>
+                            </div>
+                            <div class="preview-item">
+                                <span class="preview-item-label">Deaths</span>
+                                <span class="preview-item-value">4</span>
+                            </div>
+                        </div>
+                    </div>
+                    <textarea class="notes-input" rows="2" placeholder="Notes: My best agent so far, great at finding food..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="modal-footer-left">
+                    <button class="btn btn-secondary">⭐ Favorite</button>
+                    <button class="btn btn-secondary">✏ Rename</button>
+                    <button class="btn btn-secondary">🗑 Delete</button>
+                </div>
+                <button class="btn btn-secondary" onclick="closeDatabaseModal()">Cancel</button>
+                <button class="btn btn-primary">📥 Load Agent</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Genome Editor Modal -->
+    <div class="modal-overlay hidden" id="genome-modal">
+        <div class="modal genome-modal">
+            <div class="modal-header">
+                <span class="modal-title">Genome Editor: Agent #1</span>
+                <button class="modal-close" onclick="closeGenomeModal()">✕</button>
+            </div>
+            <div class="modal-content">
+                <div class="genome-tabs">
+                    <button class="genome-tab active">Physical</button>
+                    <button class="genome-tab">Sensory</button>
+                    <button class="genome-tab">Metabolic</button>
+                    <button class="genome-tab">Survival</button>
+                    <button class="genome-tab">Mutation</button>
+                </div>
+                <div class="genome-controls">
+                    <div class="genome-control">
+                        <div class="genome-control-header">
+                            <span class="genome-control-name">Max Speed</span>
+                            <span class="genome-control-default">Default: 150.0</span>
+                        </div>
+                        <div class="genome-control-row">
+                            <input type="range" class="control-slider" min="50" max="250" value="165">
+                            <input type="text" class="control-input" value="165.2">
+                            <button class="control-reset-btn">↺</button>
+                        </div>
+                        <div class="genome-range">
+                            <span>50</span>
+                            <span>250</span>
+                        </div>
+                    </div>
+                    <div class="genome-control">
+                        <div class="genome-control-header">
+                            <span class="genome-control-name">Max Angular Speed</span>
+                            <span class="genome-control-default">Default: 3.0</span>
+                        </div>
+                        <div class="genome-control-row">
+                            <input type="range" class="control-slider" min="1" max="6" step="0.1" value="3.2">
+                            <input type="text" class="control-input" value="3.2">
+                            <button class="control-reset-btn">↺</button>
+                        </div>
+                        <div class="genome-range">
+                            <span>1.0</span>
+                            <span>6.0</span>
+                        </div>
+                    </div>
+                    <div class="genome-control">
+                        <div class="genome-control-header">
+                            <span class="genome-control-name">Thrust Force</span>
+                            <span class="genome-control-default">Default: 500.0</span>
+                        </div>
+                        <div class="genome-control-row">
+                            <input type="range" class="control-slider" min="100" max="1000" value="520">
+                            <input type="text" class="control-input" value="520.0">
+                            <button class="control-reset-btn">↺</button>
+                        </div>
+                        <div class="genome-range">
+                            <span>100</span>
+                            <span>1000</span>
+                        </div>
+                    </div>
+                    <div class="genome-control">
+                        <div class="genome-control-header">
+                            <span class="genome-control-name">Torque Force</span>
+                            <span class="genome-control-default">Default: 1000.0</span>
+                        </div>
+                        <div class="genome-control-row">
+                            <input type="range" class="control-slider" min="200" max="2000" value="1050">
+                            <input type="text" class="control-input" value="1050.0">
+                            <button class="control-reset-btn">↺</button>
+                        </div>
+                        <div class="genome-range">
+                            <span>200</span>
+                            <span>2000</span>
+                        </div>
+                    </div>
+                    <div class="genome-control">
+                        <div class="genome-control-header">
+                            <span class="genome-control-name">Radius</span>
+                            <span class="genome-control-default">Default: 8.0</span>
+                        </div>
+                        <div class="genome-control-row">
+                            <input type="range" class="control-slider" min="4" max="20" step="0.5" value="8.5">
+                            <input type="text" class="control-input" value="8.5">
+                            <button class="control-reset-btn">↺</button>
+                        </div>
+                        <div class="genome-range">
+                            <span>4.0</span>
+                            <span>20.0</span>
+                        </div>
+                    </div>
+                    <div class="genome-control">
+                        <div class="genome-control-header">
+                            <span class="genome-control-name">Mass</span>
+                            <span class="genome-control-default">Default: 1.0</span>
+                        </div>
+                        <div class="genome-control-row">
+                            <input type="range" class="control-slider" min="0.5" max="3" step="0.1" value="1.0">
+                            <input type="text" class="control-input" value="1.0">
+                            <button class="control-reset-btn">↺</button>
+                        </div>
+                        <div class="genome-range">
+                            <span>0.5</span>
+                            <span>3.0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary">↺ Reset All</button>
+                <button class="btn btn-secondary" onclick="closeGenomeModal()">Cancel</button>
+                <button class="btn btn-primary">✓ Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="modal-overlay hidden" id="help-modal">
+        <div class="modal help-modal">
+            <div class="modal-header">
+                <span class="modal-title">Keyboard Shortcuts</span>
+                <button class="modal-close" onclick="closeHelpModal()">✕</button>
+            </div>
+            <div class="modal-content">
+                <div class="shortcuts-grid">
+                    <div class="shortcut-section">
+                        <h3>Teaching</h3>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">R</span>
+                            <span class="shortcut-action">Reward</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">X</span>
+                            <span class="shortcut-action">Punish</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">SPACE</span>
+                            <span class="shortcut-action">Push-to-Talk</span>
+                        </div>
+                    </div>
+                    <div class="shortcut-section">
+                        <h3>Time Control</h3>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">[</span>
+                            <span class="shortcut-action">Slow Down</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">]</span>
+                            <span class="shortcut-action">Speed Up</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">\</span>
+                            <span class="shortcut-action">Reset Speed</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">P</span>
+                            <span class="shortcut-action">Pause/Play</span>
+                        </div>
+                    </div>
+                    <div class="shortcut-section">
+                        <h3>Spawning</h3>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">F</span>
+                            <span class="shortcut-action">Add Food</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">V</span>
+                            <span class="shortcut-action">Add Vegetation</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">W</span>
+                            <span class="shortcut-action">Add Water</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">SHIFT+P</span>
+                            <span class="shortcut-action">Add Predator</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">D</span>
+                            <span class="shortcut-action">Delete All Veg</span>
+                        </div>
+                    </div>
+                    <div class="shortcut-section">
+                        <h3>Agent Control</h3>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">1-9</span>
+                            <span class="shortcut-action">Select Agent</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">T</span>
+                            <span class="shortcut-action">Heal Selected</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">C</span>
+                            <span class="shortcut-action">Control Mode</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">↑↓←→</span>
+                            <span class="shortcut-action">Move (in control)</span>
+                        </div>
+                    </div>
+                    <div class="shortcut-section">
+                        <h3>Save/Load</h3>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">S</span>
+                            <span class="shortcut-action">Save Agent</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">SHIFT+S</span>
+                            <span class="shortcut-action">Save All</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">L</span>
+                            <span class="shortcut-action">List Saved</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">M</span>
+                            <span class="shortcut-action">Save Map</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">SHIFT+M</span>
+                            <span class="shortcut-action">Load Map</span>
+                        </div>
+                    </div>
+                    <div class="shortcut-section">
+                        <h3>Panels</h3>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">TAB</span>
+                            <span class="shortcut-action">Toggle Left Panel</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">SHIFT+TAB</span>
+                            <span class="shortcut-action">Toggle Right Panel</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">H</span>
+                            <span class="shortcut-action">Toggle HUD</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-key">ESC</span>
+                            <span class="shortcut-action">Close Modal/Quit</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeHelpModal()">Got It</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Modal controls
+        function openDatabaseModal() {
+            document.getElementById('database-modal').classList.remove('hidden');
+        }
+        function closeDatabaseModal() {
+            document.getElementById('database-modal').classList.add('hidden');
+        }
+        function openGenomeModal() {
+            document.getElementById('genome-modal').classList.remove('hidden');
+        }
+        function closeGenomeModal() {
+            document.getElementById('genome-modal').classList.add('hidden');
+        }
+        function openHelpModal() {
+            document.getElementById('help-modal').classList.remove('hidden');
+        }
+        function closeHelpModal() {
+            document.getElementById('help-modal').classList.add('hidden');
+        }
+
+        // Close modals on escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeDatabaseModal();
+                closeGenomeModal();
+                closeHelpModal();
+            }
+        });
+
+        // Close modals on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.add('hidden');
+                }
+            });
+        });
+
+        // Tab switching for left panel
+        document.querySelectorAll('.panel-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Tab switching for genome editor
+        document.querySelectorAll('.genome-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.genome-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Agent table row selection
+        document.querySelectorAll('.agent-table tbody tr').forEach(row => {
+            row.addEventListener('click', function() {
+                document.querySelectorAll('.agent-table tbody tr').forEach(r => r.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+
+        // Database table row selection
+        document.querySelectorAll('.db-table tbody tr').forEach(row => {
+            row.addEventListener('click', function() {
+                document.querySelectorAll('.db-table tbody tr').forEach(r => r.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+    </script>
+</body>
+</html>

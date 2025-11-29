@@ -91,16 +91,26 @@ class IntegratedTeachingApp:
         self._auto_save_agents()
 
     def _auto_save_agents(self) -> None:
-        """Auto-save all living agents to the database on exit."""
+        """Auto-save all living agents to the database on exit.
+
+        If an agent was loaded from the database (has db_id), updates that record.
+        Otherwise creates a new record.
+        """
         saved = 0
+        updated = 0
         for wrapper in self.simulation.agents.values():
             if wrapper.agent.is_alive:
-                self.agent_db.save_agent(wrapper)
-                saved += 1
+                # Use db_id to update existing record instead of creating new
+                db_id = getattr(wrapper, 'db_id', None)
+                self.agent_db.save_agent(wrapper, db_id=db_id)
+                if db_id:
+                    updated += 1
+                else:
+                    saved += 1
 
-        if saved > 0:
+        if saved > 0 or updated > 0:
             print("\n" + "=" * 50)
-            print(f"  AUTO-SAVED {saved} agents to database")
+            print(f"  AUTO-SAVED: {updated} updated, {saved} new agents")
             print("  Progress will continue next session!")
             print("=" * 50 + "\n")
 
