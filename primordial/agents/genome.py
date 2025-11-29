@@ -10,7 +10,27 @@ from __future__ import annotations
 import copy
 import random
 from dataclasses import dataclass, field, fields
-from typing import Dict, Any
+from typing import Dict, Any, List
+
+
+# Stats that can be trained through behavior
+TRAINABLE_STATS: List[str] = [
+    'max_speed',
+    'vision_range',
+    'audio_range',  # hearing
+    'max_angular_speed',  # agility/reaction time
+    'eating_efficiency',  # energy efficiency
+    'max_health',
+    'damage_resistance',  # stamina
+]
+
+# Configuration for stat training
+TRAINING_CONFIG = {
+    'permanent_ratio': 0.20,  # 20% of gains become permanent
+    'decay_rate': 0.001,  # 1% per minute = 0.01/60 per second
+    'base_gain': 0.1,  # Base stat gain per qualifying event
+    'diminishing_factor': 0.1,  # Higher = faster diminishing returns
+}
 
 
 @dataclass
@@ -90,6 +110,95 @@ class AgentGenome:
     # Mutation parameters
     mutation_rate: float = 0.1
     mutation_scale: float = 0.1
+
+    # Training gains (earned through behavior, not mutation)
+    # These are stored separately and added to base stats
+    permanent_gains: Dict[str, float] = field(default_factory=dict)
+    active_gains: Dict[str, float] = field(default_factory=dict)
+
+    def __post_init__(self):
+        """Initialize training gains dicts if empty."""
+        if not self.permanent_gains:
+            self.permanent_gains = {stat: 0.0 for stat in TRAINABLE_STATS}
+        if not self.active_gains:
+            self.active_gains = {stat: 0.0 for stat in TRAINABLE_STATS}
+
+    def get_effective_stat(self, stat_name: str) -> float:
+        """Get the effective value of a stat including training gains.
+
+        Args:
+            stat_name: Name of the stat to retrieve.
+
+        Returns:
+            Base stat + permanent gains + active gains.
+        """
+        base_value = getattr(self, stat_name)
+        permanent = self.permanent_gains.get(stat_name, 0.0)
+        active = self.active_gains.get(stat_name, 0.0)
+        return base_value + permanent + active
+
+    def apply_training_gain(self, stat_name: str, amount: float) -> float:
+        """Apply a training gain to a stat with diminishing returns.
+
+        Splits gain into permanent (20%) and active (80%) portions.
+
+        Args:
+            stat_name: Stat to train.
+            amount: Raw gain amount (before diminishing returns).
+
+        Returns:
+            Actual gain applied after diminishing returns.
+        """
+        if stat_name not in TRAINABLE_STATS:
+            return 0.0
+
+        # Calculate diminishing returns based on current total gains
+        current_gains = self.permanent_gains.get(stat_name, 0.0) + self.active_gains.get(stat_name, 0.0)
+        base_value = getattr(self, stat_name)
+        gain_ratio = current_gains / base_value if base_value > 0 else 0
+
+        # Diminishing returns: gain decreases as total gains increase
+        diminishing = 1.0 / (1.0 + gain_ratio * TRAINING_CONFIG['diminishing_factor'] * 10)
+        actual_gain = amount * diminishing
+
+        # Split into permanent and active
+        permanent_portion = actual_gain * TRAINING_CONFIG['permanent_ratio']
+        active_portion = actual_gain * (1.0 - TRAINING_CONFIG['permanent_ratio'])
+
+        self.permanent_gains[stat_name] = self.permanent_gains.get(stat_name, 0.0) + permanent_portion
+        self.active_gains[stat_name] = self.active_gains.get(stat_name, 0.0) + active_portion
+
+        return actual_gain
+
+    def decay_active_gains(self, dt: float) -> None:
+        """Apply decay to active gains over time.
+
+        Args:
+            dt: Time step in seconds.
+        """
+        decay_factor = 1.0 - (TRAINING_CONFIG['decay_rate'] * dt)
+        for stat_name in TRAINABLE_STATS:
+            if stat_name in self.active_gains:
+                self.active_gains[stat_name] *= decay_factor
+
+    def get_training_summary(self) -> Dict[str, Dict[str, float]]:
+        """Get a summary of all training gains.
+
+        Returns:
+            Dict with stat names as keys, containing base/permanent/active/total.
+        """
+        summary = {}
+        for stat_name in TRAINABLE_STATS:
+            base = getattr(self, stat_name)
+            permanent = self.permanent_gains.get(stat_name, 0.0)
+            active = self.active_gains.get(stat_name, 0.0)
+            summary[stat_name] = {
+                'base': base,
+                'permanent': permanent,
+                'active': active,
+                'total': base + permanent + active,
+            }
+        return summary
 
     def mutate(self) -> AgentGenome:
         """Create mutated copy for offspring.

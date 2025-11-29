@@ -14,6 +14,7 @@ from primordial.simulation.config import SimulationConfig
 from primordial.simulation.agent_wrapper import AgentWrapper
 from primordial.agents.body import Gender
 from primordial.agents.genome import breed
+from primordial.agents.training import get_trainer
 
 
 class Simulation:
@@ -167,6 +168,17 @@ class Simulation:
 
         # 3. World physics tick
         self.world.tick(step_dt)
+
+        # 3.5. Update training (behavior detection and stat growth)
+        trainer = get_trainer()
+        for agent_id, wrapper in self.agents.items():
+            if wrapper.agent.is_alive:
+                training_events = trainer.update(wrapper.agent, self.world, step_dt)
+                if training_events:
+                    tick_metrics[f'{agent_id}_training'] = [
+                        {'stat': e.stat_name, 'gain': e.gain, 'behavior': e.behavior}
+                        for e in training_events
+                    ]
 
         # 4. Check for breeding opportunities
         breeding_results = self._check_breeding()

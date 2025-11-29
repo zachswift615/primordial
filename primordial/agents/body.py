@@ -243,14 +243,16 @@ class AgentBody(Entity):
             angular_accel = torque / moment_of_inertia
             self.angular_velocity += angular_accel * dt
 
-        # 3. Limit velocities
+        # 3. Limit velocities (use effective stats including training gains)
         speed = self.velocity.magnitude()
-        if speed > self.genome.max_speed:
-            self.velocity = self.velocity * (self.genome.max_speed / speed)
+        effective_max_speed = self.genome.get_effective_stat('max_speed')
+        if speed > effective_max_speed:
+            self.velocity = self.velocity * (effective_max_speed / speed)
 
+        effective_max_angular = self.genome.get_effective_stat('max_angular_speed')
         self.angular_velocity = max(
-            -self.genome.max_angular_speed,
-            min(self.genome.max_angular_speed, self.angular_velocity),
+            -effective_max_angular,
+            min(effective_max_angular, self.angular_velocity),
         )
 
         # 4. Update angle
