@@ -144,10 +144,13 @@ class CockpitApp:
                 self._rebuild_layout()
 
             if event.type == pygame.KEYDOWN:
+                # Get mouse position and modifiers for spawn keys
+                mouse_pos = pygame.mouse.get_pos()
+                mods = pygame.key.get_mods()
+
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
                 elif event.key == pygame.K_TAB:
-                    mods = pygame.key.get_mods()
                     if mods & pygame.KMOD_SHIFT:
                         self.right_panel_visible = not self.right_panel_visible
                     else:
@@ -157,8 +160,15 @@ class CockpitApp:
                     self._send_reward()
                 elif event.key == pygame.K_x:
                     self._send_punish()
+                # Shift+P for predator spawn - CHECK BEFORE regular P (pause)
+                elif event.key == pygame.K_p and (mods & pygame.KMOD_SHIFT):
+                    self._handle_spawn_keys(event.key, mouse_pos, mods)
+                # Regular P for pause (only if Shift not held)
                 elif event.key == pygame.K_p:
                     self.paused = not self.paused
+                # Other spawn keys
+                elif event.key in [pygame.K_f, pygame.K_v, pygame.K_w, pygame.K_d, pygame.K_t]:
+                    self._handle_spawn_keys(event.key, mouse_pos, mods)
                 # Time scale controls
                 elif event.key == pygame.K_LEFTBRACKET:  # [ = slow down
                     self.time_scale = max(self.time_scale_min, self.time_scale / 1.5)
@@ -944,6 +954,77 @@ class CockpitApp:
             self.selected_agent_id = nearest_id
         else:
             self.selected_agent_id = None
+
+    def _handle_spawn_keys(self, key: int, mouse_pos: tuple, mods: int) -> None:
+        """Handle entity spawning keyboard shortcuts.
+
+        Args:
+            key: pygame key constant
+            mouse_pos: current mouse position (screen coordinates)
+            mods: pygame key modifiers (for Shift+P detection)
+        """
+        from primordial.world.geometry import Vec2
+        from primordial.world.entities import Food, Predator, Vegetation, Water
+
+        # Convert mouse pos to world pos
+        world_x, world_y = self._screen_to_world(mouse_pos)
+        pos = Vec2(world_x, world_y)
+
+        # F = Add food
+        if key == pygame.K_f:
+            food = Food(
+                entity_id=self.simulation.world.next_entity_id,
+                position=pos,
+                energy_value=50.0,
+                sound_intensity=0.1,
+            )
+            self.simulation.world.add_entity(food)
+            print(f"Added food at ({world_x:.0f}, {world_y:.0f})")
+
+        # V = Add vegetation
+        elif key == pygame.K_v:
+            veg = Vegetation(
+                entity_id=self.simulation.world.next_entity_id,
+                position=pos,
+                radius=20.0,
+            )
+            self.simulation.world.add_entity(veg)
+            print(f"Added vegetation at ({world_x:.0f}, {world_y:.0f})")
+
+        # W = Add water
+        elif key == pygame.K_w:
+            water = Water(
+                entity_id=self.simulation.world.next_entity_id,
+                position=pos,
+                radius=30.0,
+            )
+            self.simulation.world.add_entity(water)
+            print(f"Added water at ({world_x:.0f}, {world_y:.0f})")
+
+        # D = Delete all vegetation
+        elif key == pygame.K_d:
+            for veg in list(self.simulation.world.vegetation):
+                self.simulation.world.remove_entity(veg.id)
+            print("Cleared all vegetation")
+
+        # T = Heal selected agent
+        elif key == pygame.K_t:
+            wrapper = self._get_target_agent_wrapper()
+            if wrapper:
+                wrapper.agent.energy = wrapper.agent.genome.max_energy
+                wrapper.agent.health = wrapper.agent.genome.max_health
+                print(f"Healed agent {wrapper.agent_id}")
+
+        # Shift+P = Add predator (NOTE: regular P is pause, handled elsewhere)
+        elif key == pygame.K_p and (mods & pygame.KMOD_SHIFT):
+            predator = Predator(
+                entity_id=self.simulation.world.next_entity_id,
+                position=pos,
+                patrol_center=pos,
+                patrol_radius=100.0,
+            )
+            self.simulation.world.add_entity(predator)
+            print(f"Added predator at ({world_x:.0f}, {world_y:.0f})")
 
     def _rebuild_layout(self) -> None:
         """Rebuild UI layout after panel toggle or resize."""
