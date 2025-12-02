@@ -1,19 +1,34 @@
 """Configuration for Living Resonance Network (LRN)."""
-from dataclasses import dataclass
-from typing import Tuple
+from dataclasses import dataclass, field
+from typing import Tuple, Literal
 
 
 @dataclass
 class LRNConfig:
-    """Configuration for Living Resonance Network."""
+    """Configuration for Living Resonance Network.
 
-    # Input dimensions
-    vision_shape: Tuple[int, int] = (32, 4)      # (rays, features)
+    Supports two environments:
+    - "primordial": Original 2D simulation with ray-based vision
+    - "minecraft": MineDojo 3D environment with RGB vision
+    """
+
+    # Environment selection (determines encoder types)
+    environment: Literal["primordial", "minecraft"] = "primordial"
+
+    # === Primordial-specific settings (used when environment="primordial") ===
+    vision_shape: Tuple[int, int] = (32, 4)      # (rays, features: dist,r,g,b)
     audio_shape: Tuple[int, int] = (100, 2)      # (samples, stereo)
     proprio_dim: int = 7
     touch_dim: int = 8
 
-    # Architecture
+    # === Minecraft-specific settings (used when environment="minecraft") ===
+    mc_rgb_size: int = 64                        # RGB frame size (64x64 or 128x128)
+    mc_rgb_channels: int = 3                     # RGB channels
+    mc_proprio_dim: int = 10                     # health, food, oxygen, armor, etc.
+    mc_touch_dim: int = 8                        # damage_source features
+    mc_action_dim: int = 8                       # forward/back/left/right/jump/camera_x/camera_y/attack
+
+    # === Shared architecture settings ===
     hidden_dim: int = 128                         # Embedding dimension
     num_mixing_layers: int = 6                   # Fourier mixing layers
 
@@ -26,7 +41,7 @@ class LRNConfig:
     # Heads
     pred_hidden_dim: int = 256
     action_hidden_dim: int = 128
-    action_dim: int = 5                          # Output action space
+    action_dim: int = 5                          # Output action space (Primordial default)
     reward_horizon: int = 5                      # Steps ahead to predict rewards
     reward_loss_weight: float = 1.0              # Weight for reward loss (1.0-2.0 recommended)
 
@@ -43,6 +58,17 @@ class LRNConfig:
     # Genome modulation (optional)
     genome_dim: int = 100                        # Size of genome vector
     use_genome_modulation: bool = True
+
+    def __post_init__(self):
+        """Apply environment-specific overrides."""
+        if self.environment == "minecraft":
+            # Override action_dim for Minecraft
+            self.action_dim = self.mc_action_dim
+            # Override proprio/touch dims
+            self.proprio_dim = self.mc_proprio_dim
+            self.touch_dim = self.mc_touch_dim
+            # Disable genome modulation for Minecraft (no evolution yet)
+            self.use_genome_modulation = False
 
     @property
     def total_seq_len(self) -> int:

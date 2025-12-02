@@ -6,7 +6,10 @@ from typing import Dict, Optional, Tuple
 from contextlib import contextmanager
 
 from .lrn_config import LRNConfig
-from .encoders import VisionEncoder, AudioEncoder, ProprioEncoder, TouchEncoder
+from .encoders import (
+    VisionEncoder, AudioEncoder, ProprioEncoder, TouchEncoder,
+    MinecraftVisionEncoder, MinecraftProprioEncoder, MinecraftTouchEncoder
+)
 from .lrn_mixing import LRNFourierMixingLayer
 from .lrn_heads import PredictionHead, LRNRewardHead, ActionHead
 from .genome import GenomeModulator
@@ -27,11 +30,17 @@ class LivingResonanceNetwork(nn.Module):
         self._compile_enabled = compile
         self._compiled_forward = None
 
-        # Modality encoders
-        self.vision_encoder = VisionEncoder(config)
-        self.audio_encoder = AudioEncoder(config)
-        self.proprio_encoder = ProprioEncoder(config)
-        self.touch_encoder = TouchEncoder(config)
+        # Modality encoders - selected based on environment
+        if config.environment == "minecraft":
+            self.vision_encoder = MinecraftVisionEncoder(config)
+            self.audio_encoder = AudioEncoder(config)  # Reuse for now (placeholder)
+            self.proprio_encoder = MinecraftProprioEncoder(config)
+            self.touch_encoder = MinecraftTouchEncoder(config)
+        else:  # "primordial" (default)
+            self.vision_encoder = VisionEncoder(config)
+            self.audio_encoder = AudioEncoder(config)
+            self.proprio_encoder = ProprioEncoder(config)
+            self.touch_encoder = TouchEncoder(config)
 
         # Fourier mixing layers (6 layers)
         self.mixing_layers = nn.ModuleList([
