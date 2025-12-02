@@ -278,15 +278,11 @@ class PhonemeTrainer:
         duration_loss = duration.mean() * 0.01  # Encourage shorter durations
         pitch_loss = ((pitch - 0.5) ** 2).mean() * 0.01  # Center pitch
 
-        # Audio reconstruction loss (self-supervised)
-        reconstruction_loss = F.mse_loss(reconstructed, mel)
-
-        # Total loss
+        # Total loss (skip reconstruction for now - variable input sizes)
         total_loss = (
             self.config.phoneme_loss_weight * phoneme_loss +
             self.config.duration_loss_weight * duration_loss +
-            self.config.pitch_loss_weight * pitch_loss +
-            0.1 * reconstruction_loss  # Small weight for reconstruction
+            self.config.pitch_loss_weight * pitch_loss
         )
 
         # Backward pass

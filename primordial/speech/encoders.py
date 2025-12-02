@@ -14,8 +14,8 @@ class MelSpectrogramEncoder(nn.Module):
     Takes mel spectrogram input and produces a sequence representation
     compatible with the LRN's Fourier mixing layers.
 
-    Input: (batch, n_mels, n_frames) - e.g., (batch, 80, 100)
-    Output: (batch, seq_len, hidden_dim) - e.g., (batch, 100, 128)
+    Input: (batch, n_mels, n_frames) - variable n_frames
+    Output: (batch, seq_len, hidden_dim) - fixed (batch, 100, 128)
     """
 
     def __init__(self, config: SpeechConfig):
@@ -25,30 +25,9 @@ class MelSpectrogramEncoder(nn.Module):
         self.hidden_dim = config.hidden_dim
         self.output_seq_len = config.encoder_seq_len
 
-        # CNN to process mel spectrogram
-        # Input: (batch, 1, n_mels, n_frames) treating as 2D image
-        self.conv = nn.Sequential(
-            # (1, 80, 100) -> (32, 40, 50)
-            nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(inplace=True),
-            nn.BatchNorm2d(32),
-
-            # (32, 40, 50) -> (64, 20, 25)
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(inplace=True),
-            nn.BatchNorm2d(64),
-
-            # (64, 20, 25) -> (128, 10, 12)
-            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(inplace=True),
-            nn.BatchNorm2d(128),
-        )
-
-        # Adaptive pooling to fixed size then project to sequence
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((4, self.output_seq_len // 4))
-
-        # Flatten and project to (seq_len, hidden_dim)
-        self.projection = nn.Linear(128 * 4, self.hidden_dim)
+        # Simple approach: treat each mel frame as a token
+        # Project n_mels -> hidden_dim per frame
+        self.frame_projection = nn.Linear(config.n_mels, config.hidden_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -58,31 +37,18 @@ class MelSpectrogramEncoder(nn.Module):
         Returns:
             (batch, seq_len, hidden_dim) sequence for Fourier mixing
         """
-        batch_size = x.shape[0]
+        # x: (batch, n_mels, n_frames) -> (batch, n_frames, n_mels)
+        x = x.transpose(1, 2)
 
-        # Add channel dimension: (batch, n_mels, n_frames) -> (batch, 1, n_mels, n_frames)
-        x = x.unsqueeze(1)
+        # Project each frame: (batch, n_frames, n_mels) -> (batch, n_frames, hidden_dim)
+        x = self.frame_projection(x)
 
-        # CNN forward
-        x = self.conv(x)  # (batch, 128, H, W)
-
-        # Adaptive pool to fixed size
-        x = self.adaptive_pool(x)  # (batch, 128, 4, seq_len//4)
-
-        # Reshape: merge freq dim with channels, keep time dim as sequence
-        # (batch, 128, 4, seq_len//4) -> (batch, seq_len//4, 128*4)
-        x = x.permute(0, 3, 1, 2)  # (batch, seq_len//4, 128, 4)
-        x = x.reshape(batch_size, self.output_seq_len // 4, -1)  # (batch, seq_len//4, 512)
-
-        # Project to hidden dim
-        x = self.projection(x)  # (batch, seq_len//4, hidden_dim)
-
-        # Upsample sequence to target length
-        # (batch, seq_len//4, hidden_dim) -> (batch, hidden_dim, seq_len//4)
-        x = x.permute(0, 2, 1)
+        # Interpolate to fixed sequence length
+        # (batch, n_frames, hidden_dim) -> (batch, hidden_dim, n_frames)
+        x = x.transpose(1, 2)
         x = F.interpolate(x, size=self.output_seq_len, mode='linear', align_corners=False)
         # (batch, hidden_dim, seq_len) -> (batch, seq_len, hidden_dim)
-        x = x.permute(0, 2, 1)
+        x = x.transpose(1, 2)
 
         return x
 
