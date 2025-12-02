@@ -10,13 +10,20 @@
 ### Phase 2: Self-Listening Speech Production
 Agent produces phonemes → hears itself via TTS → adjusts to match target. Like a baby babbling to learn speech.
 
-**Results:**
-| Test | Phonemes | Epochs | Match Rate |
-|------|----------|--------|------------|
-| Vowels | IY,AA,EH,UW,AH | 30 | **100%** |
-| +Consonants | +B,P,D,T,M,S,L,N | 100 | **100%** |
+**Final Results (Progressive Curriculum):**
+| Phase | Task | Epochs | Match Rate |
+|-------|------|--------|------------|
+| 1 | 5 vowels | 50 | **100%** (5/5) |
+| 2 | +5 consonants | 50 | **100%** (10/10) |
+| 3 | All 40 phonemes | 100 | **100%** (40/40) |
+| 4 | 13 word sequences | 100 | **100%** (13/13) |
 
-Key: Distinguished voiced/unvoiced pairs (B↔P, D↔T) - single dimension flip in 6D latent space.
+**Words learned:** ba, bee, ma, me, hi, go, yes, no, mom, dad, hello, food, water
+
+Key achievements:
+- Distinguished voiced/unvoiced pairs (B↔P, D↔T)
+- Recognizes first phoneme of full words
+- Progressive curriculum prevents catastrophic forgetting
 
 ### Architecture
 ```
