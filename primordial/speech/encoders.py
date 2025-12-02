@@ -91,6 +91,86 @@ class SimpleAudioEncoder(nn.Module):
         return x
 
 
+class CNNMelEncoder(nn.Module):
+    """CNN encoder for mel spectrograms.
+
+    Uses 2D convolutions to capture local spectral-temporal patterns:
+    - Formant structures (vertical patterns in mel)
+    - Temporal transitions (horizontal patterns)
+    - Phoneme boundaries (rapid changes)
+
+    This should break the 63% ceiling hit by the linear encoder.
+    """
+
+    def __init__(self, config: SpeechConfig):
+        super().__init__()
+        self.config = config
+        self.hidden_dim = config.hidden_dim
+        self.output_seq_len = config.encoder_seq_len
+        self.n_mels = config.n_mels
+
+        # CNN backbone: extract local spectral-temporal features
+        # Input: (batch, 1, n_mels, n_frames) - treat mel as 2D image
+        self.conv_layers = nn.Sequential(
+            # Layer 1: capture fine-grained patterns
+            nn.Conv2d(1, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+            nn.BatchNorm2d(32),
+            nn.GELU(),
+
+            # Layer 2: capture medium-scale patterns
+            nn.Conv2d(32, 64, kernel_size=(3, 3), stride=(2, 1), padding=(1, 1)),
+            nn.BatchNorm2d(64),
+            nn.GELU(),
+
+            # Layer 3: capture larger patterns, reduce frequency dimension
+            nn.Conv2d(64, 128, kernel_size=(3, 3), stride=(2, 1), padding=(1, 1)),
+            nn.BatchNorm2d(128),
+            nn.GELU(),
+
+            # Layer 4: final feature extraction
+            nn.Conv2d(128, self.hidden_dim, kernel_size=(3, 3), stride=(2, 1), padding=(1, 1)),
+            nn.BatchNorm2d(self.hidden_dim),
+            nn.GELU(),
+        )
+
+        # After 3 stride-2 layers on freq axis: n_mels / 8 = 80 / 8 = 10
+        self.freq_out = self.n_mels // 8
+
+        # Collapse frequency dimension and project to sequence
+        self.freq_collapse = nn.Linear(self.freq_out * self.hidden_dim, self.hidden_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x: (batch, n_mels, n_frames) mel spectrogram
+
+        Returns:
+            (batch, seq_len, hidden_dim) sequence for Fourier mixing
+        """
+        batch_size = x.shape[0]
+
+        # Add channel dimension: (batch, n_mels, n_frames) -> (batch, 1, n_mels, n_frames)
+        x = x.unsqueeze(1)
+
+        # CNN feature extraction: (batch, 1, n_mels, n_frames) -> (batch, hidden_dim, freq_out, n_frames)
+        x = self.conv_layers(x)
+
+        # Reshape: (batch, hidden_dim, freq_out, n_frames) -> (batch, n_frames, hidden_dim * freq_out)
+        x = x.permute(0, 3, 1, 2)  # (batch, n_frames, hidden_dim, freq_out)
+        x = x.reshape(batch_size, x.shape[1], -1)  # (batch, n_frames, hidden_dim * freq_out)
+
+        # Collapse frequency: (batch, n_frames, hidden_dim * freq_out) -> (batch, n_frames, hidden_dim)
+        x = self.freq_collapse(x)
+
+        # Interpolate to target sequence length
+        if x.shape[1] != self.output_seq_len:
+            x = x.permute(0, 2, 1)  # (batch, hidden_dim, n_frames)
+            x = F.interpolate(x, size=self.output_seq_len, mode='linear', align_corners=False)
+            x = x.permute(0, 2, 1)  # (batch, seq_len, hidden_dim)
+
+        return x
+
+
 def compute_mel_spectrogram(
     waveform: torch.Tensor,
     sample_rate: int = 16000,

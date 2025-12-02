@@ -1,143 +1,100 @@
-# Session Handoff: Cockpit UI Design & Implementation Plan
+# Session Handoff: Speech Production Learning
 
-**Created:** 2025-11-28
-**Purpose:** Enable continuation in a fresh context with complete precision
+**Created:** 2025-12-02
+**Purpose:** Continue training the speaking agent in a fresh context
 
 ---
 
-<original_task>
-Design and plan a comprehensive pygame-gui based "cockpit" interface for the Primordial simulation. User requirements:
-- Beautiful sci-fi/neon themed UI achievable with pygame-gui
-- Control over nearly every aspect of agents and world (stat depletion rates, reward contributions, predator reproduction, food/water stat boosts, social HP reduction, etc.)
-- Live updating agent table with 10 rows, scrollable, with ability to select and load agents from database
-- HTML/CSS mockup first, then implementation plan for converting to pygame-gui
-</original_task>
+## What We Built Today
 
-<work_completed>
-## Design Exploration (Brainstorming Skill)
-- Gathered requirements through structured questions
-- User preferences established:
-  - **Use case**: All-purpose (research, education, rapid prototyping)
-  - **Apply mode**: Live/real-time changes
-  - **Organization**: Tabbed panels
-  - **Style**: Sci-fi/Neon with **opaque panels** (user explicitly rejected semi-transparency)
-  - **Resolution**: Flexible/resizable
+### Phase 2: Self-Listening Speech Production
+Agent produces phonemes → hears itself via TTS → adjusts to match target. Like a baby babbling to learn speech.
 
-## Architecture Decision
-- Evaluated 3 layout approaches:
-  - A: Command Center (fixed panels)
-  - B: Mission Control (three-column)
-  - C: Cockpit (full-screen world with overlay panels) - **SELECTED**
-- Cockpit layout chosen for maximum world view visibility and collapsible panels
+**Results:**
+| Test | Phonemes | Epochs | Match Rate |
+|------|----------|--------|------------|
+| Vowels | IY,AA,EH,UW,AH | 30 | **100%** |
+| +Consonants | +B,P,D,T,M,S,L,N | 100 | **100%** |
 
-## Design Document Created
-**File**: `docs/plans/2025-01-28-cockpit-ui-design.md`
-- Complete color palette (CSS variables)
-- Component specifications for all 7 UI elements
-- pygame-gui widget mapping
-- Keyboard shortcuts reference
-- All design decisions documented
+Key: Distinguished voiced/unvoiced pairs (B↔P, D↔T) - single dimension flip in 6D latent space.
 
-## HTML/CSS Mockup Created
-**File**: `docs/mockups/primordial-ui-mockup.html`
-- Fully interactive mockup with:
-  - HUD top bar (FPS, speed, day/night, gen, population)
-  - Left control panel with 6 tabs (World, Agents, Learn, Rewards, Predators, Presets)
-  - Right agent panel with 10-row table and selected agent detail
-  - HUD bottom bar (teaching buttons, audio visualizer, system controls)
-  - Database browser modal
-  - Genome editor modal
-  - Help/keyboard shortcuts modal
-- All styling matches sci-fi/neon theme
-- Tab switching, row selection, modal open/close all functional
-
-## Implementation Plan Created & Refined
-**File**: `docs/plans/2025-01-28-cockpit-ui-implementation.md`
-
-Plan reviewed twice by superpowers:code-reviewer agent. Issues identified and fixed:
-- MVP scope clearly defined (Phase 1-5 vs Phase 6-7 future)
-- pygame-gui usage clarified (modals only, raw pygame for main UI)
-- `_rebuild_layout()` fully implemented (Task 3.4)
-- Resize handler added (pygame.VIDEORESIZE)
-- `_get_world_transform()` helper extracts duplicate code (DRY fix)
-- `_screen_to_world()` uses the helper
-- Task 5.2 broken into 5 subtasks (5.2-5.6) with complete code
-- Race condition fixed with early return on table click
-- Config validation with hasattr() check before setattr()
-- Audio error handling with graceful fallback
-- Theme.json error handling with defaults fallback
-</work_completed>
-
-<current_state>
-## Deliverables Status
-| Deliverable | Status | Location |
-|-------------|--------|----------|
-| Design document | Complete | `docs/plans/2025-01-28-cockpit-ui-design.md` |
-| HTML/CSS mockup | Complete | `docs/mockups/primordial-ui-mockup.html` |
-| Implementation plan | Complete | `docs/plans/2025-01-28-cockpit-ui-implementation.md` |
-| CockpitApp implementation | Not started | `primordial/interface/cockpit_app.py` |
-| theme.json | Not started | `primordial/interface/theme.json` |
-| pygame-gui in requirements | Not started | `requirements.txt` |
-
-## Plan Structure
-17 tasks across 5 MVP phases + 2 future phases:
-
-**Phase 1: Setup and Core Layout** (Tasks 1.1-1.3)
-**Phase 2: HUD Bars** (Tasks 2.1-2.2)
-**Phase 3: Side Panels** (Tasks 3.1-3.4)
-**Phase 4: Agent Selection** (Task 4.1)
-**Phase 5: Migration and Integration** (Tasks 5.1-5.6)
-**Phase 6-7: Future** (Modals, remaining tabs)
-</current_state>
-
-<next_steps>
-## Execute the Implementation Plan
-
-### Quick Start
+### Architecture
 ```
-Read these files:
-1. docs/plans/2025-01-28-cockpit-ui-implementation.md (the plan)
-2. docs/plans/2025-01-28-cockpit-ui-design.md (design decisions)
-3. docs/mockups/primordial-ui-mockup.html (open in browser for visual reference)
+Audio → CNN Encoder → Fourier Mixing → Production Head → 6D Latent
+                                                            ↓
+                                                    Snap to nearest anchor
+                                                            ↓
+                                                    Piper TTS → Audio
+                                                            ↓
+                                                Perception Head classifies
+                                                            ↓
+                                                   Loss → Update weights
 ```
 
-### Execution Options
-1. **Use executing-plans skill**:
-   ```
-   Use superpowers:executing-plans to implement docs/plans/2025-01-28-cockpit-ui-implementation.md
-   ```
+---
 
-2. **Use subagent-driven-development skill**:
-   ```
-   Use superpowers:subagent-driven-development
-   ```
+## Continue Training
 
-### First Task
-Task 1.1: Install pygame-gui and create theme.json
-- Add `pygame-gui>=0.6.0` to requirements.txt
-- Create `primordial/interface/theme.json` with sci-fi color palette
-</next_steps>
+### Resume from 10-phoneme checkpoint:
+```bash
+python -m primordial.scripts.train_production_interactive \
+  --checkpoint checkpoints/production/production_best.pt \
+  --epochs 300 \
+  --play-every 30 \
+  --phonemes IY,IH,EY,EH,AE,AA,AH,AO,OW,UW,UH,ER,AY,AW,OY,B,P,D,T,G,K,M,N,NG,F,V,S,Z,SH,TH,DH,L,R,W,Y,HH,CH,JH
+```
 
-<gotchas>
-## Critical Technical Notes
+### Or start fresh on all 41:
+```bash
+python -m primordial.scripts.train_production_interactive \
+  --epochs 300 \
+  --play-every 30 \
+  --phonemes IY,IH,EY,EH,AE,AA,AH,AO,OW,UW,UH,ER,AY,AW,OY,B,P,D,T,G,K,M,N,NG,F,V,S,Z,SH,TH,DH,L,R,W,Y,HH,CH,JH
+```
 
-1. **Opaque panels** - User explicitly rejected semi-transparency for readability
+---
 
-2. **pygame-gui is for modals only** - Main UI uses raw pygame drawing for performance
+## Key Files
 
-3. **`_get_world_transform()` helper** - Returns `(world_rect, scale, offset_x, offset_y)` tuple, used by both rendering and input
+| File | Purpose |
+|------|---------|
+| `primordial/speech/latent.py` | 6D phoneme anchors (articulatory features) |
+| `primordial/scripts/train_production_interactive.py` | Training with audio playback |
+| `primordial/scripts/decode_latent.py` | Interpret model outputs |
+| `docs/plans/2025-12-02-phase2-speech-production.md` | Full design doc |
+| `docs/SESSION-2025-12-02.md` | Session summary |
+| `checkpoints/production/production_best.pt` | Best 10-phoneme model |
 
-4. **Click handler race condition** - Table clicks must be checked FIRST with early return before world clicks
+---
 
-5. **Shift+P precedence** - Must check Shift+P (spawn predator) BEFORE regular P (pause)
+## Latent Space Design
 
-6. **Audio capture fallback** - Wrapped in try/catch with `audio_enabled` flag for graceful degradation
+6 dimensions based on articulatory phonetics:
 
-7. **Config validation** - Use hasattr() before setattr() when applying slider values
+| Dim | Feature | Example |
+|-----|---------|---------|
+| 0 | Front-Back | IY (front) ↔ UW (back) |
+| 1 | High-Low | IY (high) ↔ AA (low) |
+| 2 | Rounded | IY (unrounded) ↔ UW (rounded) |
+| 3 | Voiced | P (unvoiced) ↔ B (voiced) |
+| 4 | Manner | P (stop) ↔ S (fricative) ↔ M (nasal) |
+| 5 | Type | Vowels (-1) ↔ Consonants (+1) |
 
-## Files to Reference
-- Existing interface: `primordial/interface/integrated_app.py`
-- Existing renderer: `primordial/interface/renderer.py`
-- Existing config: `primordial/interface/config.py`
-- Agent database: `primordial/simulation/agent_database.py`
-</gotchas>
+---
+
+## Technical Notes
+
+1. **Audio pops/clicks** - TTS output lacks fade in/out. Model learns despite this.
+2. **MPS issues** - Complex tensor ops fail on Apple Silicon. Use `--device cpu`.
+3. **Sample rates** - Piper: 22050Hz, Model: 16000Hz. Resampling handled.
+4. **Not progressive** - Each run starts fresh unless `--checkpoint` used.
+
+---
+
+## Future Work
+
+1. Fix audio artifacts (add envelope to TTS output)
+2. Sequence production (syllables → words)
+3. Continuous latent decoder (smooth inter-phoneme sounds)
+4. Cross-modal grounding (sounds ↔ meanings)
+5. Run overnight on full 41 phonemes

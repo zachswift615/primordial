@@ -26,6 +26,7 @@ class SpeechConfig:
     # Model architecture
     hidden_dim: int = 128              # Match LRN hidden dim
     encoder_seq_len: int = 100         # Output sequence length from encoder
+    encoder_type: Literal["linear", "cnn"] = "linear"  # Audio encoder type
 
     # Speech head output
     num_phonemes: int = NUM_PHONEMES   # 41 (from phonemes.py)
@@ -49,6 +50,12 @@ class SpeechConfig:
     # Training curriculum
     curriculum_phase: Literal["phoneme_classification", "phoneme_production",
                               "sequences", "words"] = "phoneme_classification"
+
+    # Phase 2: Production
+    latent_dim: int = 6                    # Articulatory feature dimensions
+    babbling_ratio: float = 0.8            # Initial ratio of babbling vs imitation
+    babbling_decay: float = 0.02           # Reduce babbling by this per epoch
+    min_babbling_ratio: float = 0.2        # Floor for babbling ratio
 
     # Self-listening (agent hears its own output)
     enable_self_listening: bool = True

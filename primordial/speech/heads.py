@@ -166,6 +166,60 @@ class SpeechSequenceHead(nn.Module):
         return phoneme_logits, duration, pitch
 
 
+class ProductionHead(nn.Module):
+    """Production head that outputs latent motor commands.
+
+    Takes pooled features and produces:
+    - latent: (batch, latent_dim) - latent motor representation (constrained to [-1, 1])
+    - duration: (batch, 1) - how long to produce the sound (0-1)
+    - pitch: (batch, 1) - pitch/F0 control (0-1)
+
+    This is used for motor learning where the agent learns to control
+    a low-dimensional latent space that drives vocalization.
+    """
+
+    def __init__(self, config: SpeechConfig, input_dim: int = 384):
+        super().__init__()
+        self.config = config
+        self.latent_dim = config.latent_dim
+
+        # Latent projection: input -> 128 -> latent_dim with Tanh
+        self.latent_proj = nn.Sequential(
+            nn.Linear(input_dim, 128),
+            nn.GELU(),
+            nn.Linear(128, self.latent_dim),
+            nn.Tanh(),  # Constrain to [-1, 1]
+        )
+
+        # Duration head (outputs 0-1)
+        self.duration_head = nn.Sequential(
+            nn.Linear(input_dim, 1),
+            nn.Sigmoid(),
+        )
+
+        # Pitch head (outputs 0-1)
+        self.pitch_head = nn.Sequential(
+            nn.Linear(input_dim, 1),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, pooled: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Args:
+            pooled: (batch, input_dim) pooled features from Fourier mixing
+
+        Returns:
+            latent: (batch, latent_dim) - latent motor commands in [-1, 1]
+            duration: (batch, 1) - normalized duration (0-1)
+            pitch: (batch, 1) - normalized pitch (0-1)
+        """
+        latent = self.latent_proj(pooled)
+        duration = self.duration_head(pooled)
+        pitch = self.pitch_head(pooled)
+
+        return latent, duration, pitch
+
+
 class AudioReconstructionHead(nn.Module):
     """Head for reconstructing audio features (for self-supervised learning).
 

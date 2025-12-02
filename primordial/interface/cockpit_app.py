@@ -242,6 +242,14 @@ class CockpitApp:
         self.current_preset = "Normal"
         self._load_custom_presets()
 
+        # Training level state
+        self.completed_levels: set = set()  # Set of completed level keys
+        self.current_level: Optional[str] = None  # Currently active level key
+        self.level_start_time: float = 0.0  # When current level started
+        self.level_best_times: Dict[str, float] = {}  # Best survival times per level
+        self.level_btn_rects: Dict[str, pygame.Rect] = {}  # Button rects for levels
+        self._load_training_progress()
+
         # Load saved game config (restores slider values, etc.)
         self._load_game_config()
 
@@ -410,11 +418,11 @@ class CockpitApp:
 
                 # Left panel tab clicks
                 if self.left_panel_visible:
-                    tabs = ["world", "agents", "learn", "rewards", "predators", "presets"]
+                    tabs = ["world", "agents", "learn", "rewards", "predators", "presets", "training", "levels"]
                     tab_y = self.TOPBAR_HEIGHT + 44
                     tab_x = 8
                     for key in tabs:
-                        tab_width = 42 if key == "predators" else 46
+                        tab_width = 42 if key in ["predators", "training", "levels"] else 46
                         tab_rect = pygame.Rect(tab_x, tab_y, tab_width, 24)
                         if tab_rect.collidepoint(mouse_pos):
                             self.left_panel_tab = key
@@ -492,6 +500,19 @@ class CockpitApp:
                     if hasattr(self, 'save_preset_btn_rect') and self.save_preset_btn_rect.collidepoint(mouse_pos):
                         name = f"Custom_{datetime.now().strftime('%H%M%S')}"
                         self._save_current_as_preset(name)
+
+                # Levels tab buttons
+                if self.left_panel_visible and self.left_panel_tab == "levels":
+                    # End level button
+                    if hasattr(self, 'end_level_btn_rect') and self.end_level_btn_rect.collidepoint(mouse_pos):
+                        self._end_training_level()
+
+                    # Level selection buttons
+                    if hasattr(self, 'level_btn_rects'):
+                        for level_key, rect in self.level_btn_rects.items():
+                            if rect.collidepoint(mouse_pos):
+                                self._start_training_level(level_key)
+                                break
 
                 # Sort dropdown toggle
                 if hasattr(self, 'sort_dropdown_rect') and self.sort_dropdown_rect.collidepoint(mouse_pos):
@@ -1112,13 +1133,13 @@ class CockpitApp:
         self.screen.blit(arrow, (btn_rect.x + 8, btn_rect.y + 4))
 
         # Tabs
-        tabs = ["World", "Agents", "Learn", "Rewards", "Pred", "Presets"]
-        tab_keys = ["world", "agents", "learn", "rewards", "predators", "presets"]
+        tabs = ["World", "Agents", "Learn", "Rewards", "Pred", "Presets", "Train", "Levels"]
+        tab_keys = ["world", "agents", "learn", "rewards", "predators", "presets", "training", "levels"]
         tab_y = self.TOPBAR_HEIGHT + 44
         tab_x = 8
 
         for i, (label, key) in enumerate(zip(tabs, tab_keys)):
-            tab_width = 42 if label in ["Pred"] else 46
+            tab_width = 42 if label in ["Pred", "Train", "Levels"] else 46
             tab_rect = pygame.Rect(tab_x, tab_y, tab_width, 24)
 
             is_active = self.left_panel_tab == key
@@ -1466,10 +1487,379 @@ class CockpitApp:
             self.screen.blit(save_text, (save_rect.centerx - save_text.get_width() // 2, y + 6))
             self.save_preset_btn_rect = save_rect
 
+        elif self.left_panel_tab == "training":
+            self._render_training_tab(x, y, width)
+
+        elif self.left_panel_tab == "levels":
+            self._render_levels_tab(x, y, width)
+
         else:
             # Placeholder for other tabs
             content_text = self.font_small.render(f"[{self.left_panel_tab.upper()} controls]", True, self.TEXT_DIM)
             self.screen.blit(content_text, (x, y + 16))
+
+    def _render_training_tab(self, x: int, y: int, width: int) -> None:
+        """Render training stats tab with base/permanent/active breakdown."""
+        from primordial.agents.genome import TRAINABLE_STATS
+
+        # Check if we have a selected agent
+        if not self.selected_agent_id or self.selected_agent_id not in self.simulation.agents:
+            no_agent_text = self.font_small.render("Select an agent to view", True, self.TEXT_DIM)
+            self.screen.blit(no_agent_text, (x, y + 16))
+            training_text = self.font_small.render("training stats", True, self.TEXT_DIM)
+            self.screen.blit(training_text, (x, y + 34))
+            return
+
+        wrapper = self.simulation.agents[self.selected_agent_id]
+        agent = wrapper.agent
+        genome = agent.genome
+
+        # Agent header
+        agent_label = self.font_small.render(f"Agent: {self.selected_agent_id}", True, self.CYAN)
+        self.screen.blit(agent_label, (x, y))
+        y += 20
+
+        # Status indicator
+        status_color = self.GREEN if agent.is_alive else self.RED
+        status_text = "ALIVE" if agent.is_alive else "DEAD"
+        status = self.font_small.render(status_text, True, status_color)
+        self.screen.blit(status, (x, y))
+        y += 24
+
+        # TRAINING STATS section header
+        section = self.font_small.render("TRAINING STATS", True, self.TEXT_DIM)
+        self.screen.blit(section, (x, y))
+        pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+        y += 24
+
+        # Legend
+        legend_items = [
+            ("Base", self.TEXT_DIM),
+            ("Perm", self.GREEN),
+            ("Active", self.CYAN),
+        ]
+        legend_x = x
+        for label, color in legend_items:
+            # Color box
+            box_rect = pygame.Rect(legend_x, y, 10, 10)
+            pygame.draw.rect(self.screen, color, box_rect)
+            # Label
+            label_text = self.font_small.render(label, True, self.TEXT_DIM)
+            self.screen.blit(label_text, (legend_x + 14, y - 2))
+            legend_x += 60 + label_text.get_width() // 2
+        y += 20
+
+        # Stat display names
+        stat_display_names = {
+            'max_speed': 'Speed',
+            'vision_range': 'Vision',
+            'audio_range': 'Hearing',
+            'max_angular_speed': 'Agility',
+            'eating_efficiency': 'Efficiency',
+            'max_health': 'Health',
+            'damage_resistance': 'Stamina',
+        }
+
+        # Render each trainable stat
+        for stat_name in TRAINABLE_STATS:
+            display_name = stat_display_names.get(stat_name, stat_name)
+            summary = genome.get_training_summary()
+            stat_data = summary.get(stat_name, {'base': 0, 'permanent': 0, 'active': 0, 'total': 0})
+
+            base = stat_data['base']
+            permanent = stat_data['permanent']
+            active = stat_data['active']
+            total = stat_data['total']
+
+            # Calculate percentages for bar display
+            # Use base * 2 as max for visual reference (100% growth = 2x base)
+            max_display = base * 2 if base > 0 else 100
+            bar_width = width - 60  # Leave room for value
+
+            # Stat name
+            name_text = self.font_small.render(display_name, True, self.TEXT_NORMAL)
+            self.screen.blit(name_text, (x, y))
+
+            # Value (right side)
+            val_str = f"{total:.1f}" if total < 100 else f"{total:.0f}"
+            val_text = self.font_small.render(val_str, True, self.TEXT_BRIGHT)
+            self.screen.blit(val_text, (x + width - val_text.get_width(), y))
+
+            y += 16
+
+            # Bar background
+            bar_rect = pygame.Rect(x, y, bar_width, 12)
+            pygame.draw.rect(self.screen, (37, 37, 48), bar_rect, border_radius=2)
+
+            # Calculate widths
+            base_width = int(bar_width * (base / max_display)) if max_display > 0 else 0
+            perm_width = int(bar_width * (permanent / max_display)) if max_display > 0 else 0
+            active_width = int(bar_width * (active / max_display)) if max_display > 0 else 0
+
+            # Clamp to available space
+            base_width = min(base_width, bar_width)
+            perm_width = min(perm_width, bar_width - base_width)
+            active_width = min(active_width, bar_width - base_width - perm_width)
+
+            # Draw base (gray)
+            if base_width > 0:
+                base_rect = pygame.Rect(x, y, base_width, 12)
+                pygame.draw.rect(self.screen, self.TEXT_DIM, base_rect, border_radius=2)
+
+            # Draw permanent (green)
+            if perm_width > 0:
+                perm_rect = pygame.Rect(x + base_width, y, perm_width, 12)
+                pygame.draw.rect(self.screen, self.GREEN, perm_rect)
+
+            # Draw active (cyan)
+            if active_width > 0:
+                active_rect = pygame.Rect(x + base_width + perm_width, y, active_width, 12)
+                pygame.draw.rect(self.screen, self.CYAN, active_rect)
+
+            # Breakdown text below bar
+            y += 14
+            breakdown = f"+{permanent:.2f} perm, +{active:.2f} active"
+            breakdown_text = self.font_small.render(breakdown, True, self.TEXT_DIM)
+            self.screen.blit(breakdown_text, (x, y))
+
+            y += 22
+
+        # RECENT TRAINING section
+        y += 8
+        section = self.font_small.render("RECENT EVENTS", True, self.TEXT_DIM)
+        self.screen.blit(section, (x, y))
+        pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+        y += 24
+
+        # Get recent training events from the trainer
+        from primordial.agents.training import get_trainer
+        trainer = get_trainer()
+        events = trainer.get_recent_events(self.selected_agent_id)
+
+        if not events:
+            no_events = self.font_small.render("No recent training", True, self.TEXT_DIM)
+            self.screen.blit(no_events, (x, y))
+        else:
+            # Show last 4 events (most recent first)
+            for event in reversed(events[-4:]):
+                icon = ""
+                if event.stat_name == "max_speed":
+                    icon = "[SPD]"
+                elif event.stat_name == "vision_range":
+                    icon = "[VIS]"
+                elif event.stat_name == "max_angular_speed":
+                    icon = "[AGI]"
+                else:
+                    icon = "[+]"
+
+                event_text = f"{icon} +{event.gain:.3f}"
+                event_render = self.font_small.render(event_text, True, self.GREEN)
+                self.screen.blit(event_render, (x, y))
+                y += 16
+
+    def _render_levels_tab(self, x: int, y: int, width: int) -> None:
+        """Render training levels selection tab."""
+        from primordial.simulation.training_levels import (
+            TRAINING_LEVELS, check_level_unlocked, get_star_rating
+        )
+
+        # Header
+        section = self.font_small.render("TRAINING LEVELS", True, self.TEXT_DIM)
+        self.screen.blit(section, (x, y))
+        pygame.draw.line(self.screen, (42, 42, 56), (x, y + 16), (x + width, y + 16))
+        y += 24
+
+        # Current level indicator
+        if self.current_level:
+            level_info = TRAINING_LEVELS.get(self.current_level)
+            if level_info:
+                current_text = self.font_small.render(f"Playing: {level_info.name}", True, self.CYAN)
+                self.screen.blit(current_text, (x, y))
+                y += 18
+
+                # Show elapsed time
+                import time
+                elapsed = time.time() - self.level_start_time
+                time_text = self.font_small.render(f"Time: {int(elapsed)}s", True, self.TEXT_BRIGHT)
+                self.screen.blit(time_text, (x, y))
+                y += 24
+
+                # End level button
+                end_rect = pygame.Rect(x, y, width, 24)
+                pygame.draw.rect(self.screen, (37, 37, 48), end_rect, border_radius=4)
+                pygame.draw.rect(self.screen, self.RED, end_rect, 1, border_radius=4)
+                end_text = self.font_small.render("End Level", True, self.RED)
+                self.screen.blit(end_text, (end_rect.centerx - end_text.get_width() // 2, y + 4))
+                self.end_level_btn_rect = end_rect
+                y += 32
+        else:
+            self.end_level_btn_rect = pygame.Rect(0, 0, 0, 0)
+
+        y += 8
+
+        # Level buttons
+        self.level_btn_rects = {}
+        btn_height = 48
+
+        for level_key, level in TRAINING_LEVELS.items():
+            is_unlocked = check_level_unlocked(level_key, self.completed_levels)
+            is_completed = level_key in self.completed_levels
+            is_current = level_key == self.current_level
+
+            # Button background
+            btn_rect = pygame.Rect(x, y, width, btn_height)
+
+            if is_current:
+                bg_color = (42, 56, 42)  # Active green tint
+                border_color = self.GREEN
+            elif is_unlocked:
+                bg_color = (37, 37, 48)
+                border_color = self.CYAN_DIM
+            else:
+                bg_color = (30, 30, 38)
+                border_color = self.TEXT_DIM
+
+            pygame.draw.rect(self.screen, bg_color, btn_rect, border_radius=4)
+            pygame.draw.rect(self.screen, border_color, btn_rect, 1, border_radius=4)
+
+            if is_unlocked:
+                self.level_btn_rects[level_key] = btn_rect
+
+            # Level name
+            text_color = self.TEXT_BRIGHT if is_unlocked else self.TEXT_DIM
+            name_text = self.font_small.render(level.name, True, text_color)
+            self.screen.blit(name_text, (x + 8, y + 4))
+
+            # Stars
+            best_time = self.level_best_times.get(level_key, 0)
+            stars = get_star_rating(level_key, best_time) if best_time > 0 else 0
+
+            star_x = x + width - 50
+            for i in range(3):
+                star_char = "*" if i < stars else "."
+                star_color = self.YELLOW if i < stars else self.TEXT_DIM
+                star_text = self.font_small.render(star_char, True, star_color)
+                self.screen.blit(star_text, (star_x + i * 12, y + 4))
+
+            # Trains info
+            trains_text = self.font_small.render(f"Trains: {level.trains[:20]}...", True, self.TEXT_DIM)
+            self.screen.blit(trains_text, (x + 8, y + 22))
+
+            # Lock icon for locked levels
+            if not is_unlocked:
+                lock_text = self.font_small.render("[Locked]", True, self.TEXT_DIM)
+                self.screen.blit(lock_text, (x + width - 60, y + 22))
+
+            # Best time for completed levels
+            if best_time > 0:
+                best_text = self.font_small.render(f"Best: {int(best_time)}s", True, self.GREEN)
+                self.screen.blit(best_text, (x + width - 80, y + 36))
+
+            y += btn_height + 4
+
+            # Stop rendering if we run out of space
+            if y > self.window_height - self.BOTTOMBAR_HEIGHT - 60:
+                break
+
+    def _load_training_progress(self) -> None:
+        """Load training level progress from disk."""
+        progress_file = self.user_data_dir / "training_progress.json"
+        if progress_file.exists():
+            try:
+                with open(progress_file) as f:
+                    data = json.load(f)
+                    self.completed_levels = set(data.get('completed', []))
+                    self.level_best_times = data.get('best_times', {})
+            except Exception as e:
+                print(f"Warning: Could not load training progress: {e}")
+                self.completed_levels = set()
+                self.level_best_times = {}
+
+    def _save_training_progress(self) -> None:
+        """Save training level progress to disk."""
+        progress_file = self.user_data_dir / "training_progress.json"
+        try:
+            with open(progress_file, 'w') as f:
+                json.dump({
+                    'completed': list(self.completed_levels),
+                    'best_times': self.level_best_times,
+                }, f, indent=2)
+        except Exception as e:
+            print(f"Warning: Could not save training progress: {e}")
+
+    def _start_training_level(self, level_key: str) -> None:
+        """Start a training level.
+
+        Args:
+            level_key: Key of the level to start.
+        """
+        from primordial.simulation.training_levels import get_level_config, check_level_unlocked
+
+        if not check_level_unlocked(level_key, self.completed_levels):
+            print(f"Level {level_key} is locked!")
+            return
+
+        import time
+
+        # Get level config
+        level_config = get_level_config(level_key)
+
+        # Preserve learning settings
+        level_config.learning_enabled = self.sim_config.learning_enabled
+        level_config.lrn_hidden_dim = self.sim_config.lrn_hidden_dim
+        level_config.lrn_num_mixing_layers = self.sim_config.lrn_num_mixing_layers
+        level_config.learning_rate = self.sim_config.learning_rate
+
+        # Create new simulation with level config
+        self.sim_config = level_config
+        self.simulation = Simulation(self.sim_config)
+
+        # Update control values to match new config
+        self.control_values.update({
+            "max_agents": level_config.max_agents,
+            "initial_food": level_config.initial_food,
+            "max_food": level_config.max_food,
+            "predator_count": level_config.predator_count,
+        })
+
+        # Set level state
+        self.current_level = level_key
+        self.level_start_time = time.time()
+
+        # Auto-select first agent
+        if self.simulation.agents:
+            self.selected_agent_id = next(iter(self.simulation.agents.keys()))
+
+        print(f"Started training level: {level_key}")
+
+    def _end_training_level(self) -> None:
+        """End the current training level and record results."""
+        if not self.current_level:
+            return
+
+        import time
+        from primordial.simulation.training_levels import TRAINING_LEVELS
+
+        elapsed = time.time() - self.level_start_time
+
+        # Update best time
+        if self.current_level not in self.level_best_times or elapsed > self.level_best_times[self.current_level]:
+            self.level_best_times[self.current_level] = elapsed
+
+        # Check if level should be marked complete (survived at least 1 star threshold)
+        level = TRAINING_LEVELS.get(self.current_level)
+        if level and elapsed >= level.star_thresholds[0]:
+            self.completed_levels.add(self.current_level)
+            print(f"Level {self.current_level} completed!")
+
+        # Save progress
+        self._save_training_progress()
+
+        print(f"Ended level {self.current_level} after {elapsed:.1f}s")
+
+        # Reset level state
+        self.current_level = None
+        self.level_start_time = 0.0
 
     def _render_right_panel(self) -> None:
         """Render right agent panel."""

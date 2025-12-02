@@ -56,11 +56,60 @@ class TTSBackend(ABC):
 class PiperTTS(TTSBackend):
     """Piper TTS backend.
 
-    Piper is a fast, local neural TTS system.
+    Piper is a fast, local neural TTS system with direct phoneme synthesis.
     Install: pip install piper-tts
 
     Models: https://github.com/rhasspy/piper/blob/master/VOICES.md
     """
+
+    # ARPABET to IPA mapping for Piper
+    # Based on https://en.wikipedia.org/wiki/ARPABET
+    ARPABET_TO_IPA = {
+        # Vowels
+        'AA': 'ɑ',   # odd, father
+        'AE': 'æ',   # at, bat
+        'AH': 'ʌ',   # hut, but
+        'AO': 'ɔ',   # ought, all
+        'AW': 'aʊ',  # cow, how
+        'AY': 'aɪ',  # hide, my
+        'EH': 'ɛ',   # ed, bet
+        'ER': 'ɜɹ',  # hurt, bird (use ɜ + ɹ instead of ɝ which some models lack)
+        'EY': 'eɪ',  # ate, say
+        'IH': 'ɪ',   # it, bit
+        'IY': 'i',   # eat, bee
+        'OW': 'oʊ',  # oat, show
+        'OY': 'ɔɪ',  # toy, boy
+        'UH': 'ʊ',   # hood, could
+        'UW': 'u',   # two, blue
+        # Consonants
+        'B': 'b',
+        'CH': 'tʃ',
+        'D': 'd',
+        'DH': 'ð',   # the, that
+        'F': 'f',
+        'G': 'ɡ',
+        'HH': 'h',
+        'JH': 'dʒ',  # judge
+        'K': 'k',
+        'L': 'l',
+        'M': 'm',
+        'N': 'n',
+        'NG': 'ŋ',   # sing
+        'P': 'p',
+        'R': 'ɹ',
+        'S': 's',
+        'SH': 'ʃ',
+        'T': 't',
+        'TH': 'θ',   # think
+        'V': 'v',
+        'W': 'w',
+        'Y': 'j',
+        'Z': 'z',
+        'ZH': 'ʒ',   # measure
+        # Special
+        'SIL': ' ',
+        'UNK': '',
+    }
 
     def __init__(self, model_path: str, config: Optional[SpeechConfig] = None):
         """
@@ -91,20 +140,33 @@ class PiperTTS(TTSBackend):
         durations: Optional[List[float]] = None,
         pitches: Optional[List[float]] = None,
     ) -> np.ndarray:
-        """Synthesize from phonemes.
+        """Synthesize from ARPABET phonemes using direct phoneme synthesis.
 
-        Note: Piper's phoneme input is limited. This converts phonemes
-        to approximate text and synthesizes that. For true phoneme control,
-        we'd need to modify Piper's internals or use a different backend.
+        Converts ARPABET phonemes to IPA, then uses Piper's phoneme_ids_to_audio
+        for high-fidelity phoneme-to-audio synthesis.
         """
         self._load_model()
 
-        # Convert ARPABET phonemes to approximate pronunciation
-        # This is a simplification - proper phoneme synthesis would need
-        # direct access to Piper's phoneme encoder
-        text = self._phonemes_to_approximate_text(phonemes)
+        # Convert ARPABET to IPA phonemes
+        ipa_phonemes = []
+        for p in phonemes:
+            ipa = self.ARPABET_TO_IPA.get(p.upper(), '')
+            if ipa:
+                # Add each IPA character separately (some are digraphs)
+                ipa_phonemes.extend(list(ipa))
 
-        return self.synthesize_text(text)
+        if not ipa_phonemes:
+            return np.zeros(int(self._sample_rate * 0.1), dtype=np.float32)
+
+        try:
+            # Use Piper's direct phoneme synthesis
+            phoneme_ids = self._piper.phonemes_to_ids(ipa_phonemes)
+            audio = self._piper.phoneme_ids_to_audio(phoneme_ids)
+            return audio.astype(np.float32)
+        except Exception as e:
+            # Fallback to text synthesis if direct phoneme fails
+            print(f"Warning: Direct phoneme synthesis failed ({e}), using text fallback")
+            return self.synthesize_text(self._phonemes_to_approximate_text(phonemes))
 
     def synthesize_text(self, text: str) -> np.ndarray:
         """Synthesize from text."""
@@ -128,12 +190,7 @@ class PiperTTS(TTSBackend):
         return self._sample_rate
 
     def _phonemes_to_approximate_text(self, phonemes: List[str]) -> str:
-        """Convert phoneme sequence to approximate pronounceable text.
-
-        This is a hack for Piper which doesn't have direct phoneme input.
-        Maps phonemes to letter combinations that typically produce those sounds.
-        """
-        # Rough ARPABET to text mapping
+        """Convert phoneme sequence to approximate pronounceable text (fallback)."""
         mapping = {
             'AA': 'ah', 'AE': 'a', 'AH': 'uh', 'AO': 'aw', 'AW': 'ow',
             'AY': 'eye', 'EH': 'eh', 'ER': 'er', 'EY': 'ay', 'IH': 'ih',
@@ -145,12 +202,7 @@ class PiperTTS(TTSBackend):
             'W': 'w', 'Y': 'y', 'Z': 'z', 'ZH': 'zh',
             'SIL': ' ', 'UNK': '',
         }
-
-        text_parts = []
-        for p in phonemes:
-            text_parts.append(mapping.get(p.upper(), ''))
-
-        return ''.join(text_parts)
+        return ''.join(mapping.get(p.upper(), '') for p in phonemes)
 
 
 class DummyTTS(TTSBackend):
@@ -163,11 +215,24 @@ class DummyTTS(TTSBackend):
         self.config = config or SpeechConfig()
         self._sample_rate = config.sample_rate if config else 16000
 
-        # Map phonemes to frequencies (arbitrary but consistent)
+        # Map each ARPABET phoneme to a unique frequency
+        # Vowels get lower frequencies (formant-like), consonants higher
+        from .phonemes import PHONEME_INVENTORY
         self._phoneme_freqs = {}
-        base_freq = 200
-        for i, p in enumerate(['SIL'] + list('AEIOU') + list('BCDFGHJKLMNPQRSTVWXYZ')):
-            self._phoneme_freqs[p] = base_freq + i * 20
+
+        # Vowels: 200-400 Hz range (distinct formant-like)
+        vowels = ['AA', 'AE', 'AH', 'AO', 'AW', 'AY', 'EH', 'ER', 'EY', 'IH', 'IY', 'OW', 'OY', 'UH', 'UW']
+        for i, v in enumerate(vowels):
+            self._phoneme_freqs[v] = 200 + i * 15  # 200-410 Hz
+
+        # Consonants: 450-800 Hz range
+        consonants = ['B', 'CH', 'D', 'DH', 'F', 'G', 'HH', 'JH', 'K', 'L', 'M', 'N', 'NG', 'P', 'R', 'S', 'SH', 'T', 'TH', 'V', 'W', 'Y', 'Z', 'ZH']
+        for i, c in enumerate(consonants):
+            self._phoneme_freqs[c] = 450 + i * 15  # 450-795 Hz
+
+        # Special tokens
+        self._phoneme_freqs['SIL'] = 0
+        self._phoneme_freqs['UNK'] = 100
 
     def synthesize_phonemes(
         self,
@@ -175,19 +240,45 @@ class DummyTTS(TTSBackend):
         durations: Optional[List[float]] = None,
         pitches: Optional[List[float]] = None,
     ) -> np.ndarray:
-        """Generate simple tones for phonemes."""
+        """Generate simple tones for phonemes.
+
+        Each phoneme gets a unique frequency, making classification learnable.
+        Adds slight variations to prevent overfitting to exact frequencies.
+        """
         if durations is None:
             durations = [0.1] * len(phonemes)  # 100ms per phoneme
 
         audio_parts = []
         for i, (phoneme, duration) in enumerate(zip(phonemes, durations)):
-            freq = pitches[i] if pitches else self._phoneme_freqs.get(phoneme[0], 300)
+            # Look up frequency by full phoneme name
+            base_freq = self._phoneme_freqs.get(phoneme.upper(), 300)
+
+            # Use pitch override if provided, otherwise add small random variation
+            if pitches and i < len(pitches):
+                freq = pitches[i]
+            else:
+                # Add ±5% variation to prevent overfitting to exact frequencies
+                freq = base_freq * (1 + np.random.uniform(-0.05, 0.05))
+
             t = np.linspace(0, duration, int(self._sample_rate * duration))
 
-            if phoneme == SILENCE:
+            if phoneme == SILENCE or base_freq == 0:
                 wave = np.zeros_like(t)
             else:
-                wave = 0.3 * np.sin(2 * np.pi * freq * t)
+                # Add harmonics for richer sound (more speech-like)
+                wave = (0.3 * np.sin(2 * np.pi * freq * t) +
+                        0.15 * np.sin(2 * np.pi * freq * 2 * t) +  # 2nd harmonic
+                        0.075 * np.sin(2 * np.pi * freq * 3 * t))  # 3rd harmonic
+
+                # Apply simple envelope (attack/decay) for more natural sound
+                envelope = np.ones_like(t)
+                attack_samples = min(int(0.01 * self._sample_rate), len(t) // 4)
+                decay_samples = min(int(0.02 * self._sample_rate), len(t) // 4)
+                if attack_samples > 0:
+                    envelope[:attack_samples] = np.linspace(0, 1, attack_samples)
+                if decay_samples > 0:
+                    envelope[-decay_samples:] = np.linspace(1, 0, decay_samples)
+                wave *= envelope
 
             audio_parts.append(wave.astype(np.float32))
 

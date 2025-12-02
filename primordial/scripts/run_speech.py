@@ -69,6 +69,12 @@ def parse_args():
         help="Device (default: auto)"
     )
     parser.add_argument(
+        "--encoder",
+        choices=["linear", "cnn"],
+        default="linear",
+        help="Audio encoder type: linear (simple) or cnn (richer features)"
+    )
+    parser.add_argument(
         "--checkpoint",
         type=str,
         help="Path to checkpoint to resume from"
@@ -102,6 +108,7 @@ def main():
     print("=" * 60)
     print(f"Phase: {args.phase}")
     print(f"Device: {device}")
+    print(f"Encoder: {args.encoder}")
     print(f"Epochs: {args.epochs}")
     print(f"Synthetic data: {args.synthetic}")
     if not args.synthetic:
@@ -114,10 +121,15 @@ def main():
         SyntheticPhonemeDataset, NUM_PHONEMES
     )
 
+    # Import production trainer if needed
+    if args.phase == "production":
+        from primordial.speech.training import ProductionTrainer
+
     # Create config
     config = SpeechConfig(
         learning_rate=args.lr,
         batch_size=args.batch_size,
+        encoder_type=args.encoder,
         tts_backend="piper" if not args.synthetic else "dummy",
         tts_model_path=args.voice if not args.synthetic else "",
     )
@@ -128,8 +140,13 @@ def main():
     param_count = sum(p.numel() for p in model.parameters())
     print(f"Model parameters: {param_count:,}")
 
-    # Create trainer
-    trainer = PhonemeTrainer(model, config, device=device)
+    # Create trainer based on phase
+    if args.phase == "production":
+        trainer = ProductionTrainer(model, config, device=device)
+        print("Using ProductionTrainer for production phase")
+    else:
+        trainer = PhonemeTrainer(model, config, device=device)
+        print("Using PhonemeTrainer for classification phase")
 
     # Load checkpoint if provided
     if args.checkpoint:
@@ -140,11 +157,12 @@ def main():
     print("\nCreating dataset...")
     if args.synthetic:
         dataset = SyntheticPhonemeDataset(config, samples_per_phoneme=20)
-        print(f"Synthetic dataset: {len(dataset)} samples ({NUM_PHONEMES} phonemes × 20 each)")
+        print(f"Synthetic dataset (DummyTTS): {len(dataset)} samples ({NUM_PHONEMES} phonemes × 20 each)")
     else:
-        # TODO: PhonemeDataset with real audio
-        print("Using synthetic data (real audio dataset not yet implemented)")
+        # Use real Piper TTS for dataset generation
+        print(f"Generating dataset with Piper TTS: {args.voice}")
         dataset = SyntheticPhonemeDataset(config, samples_per_phoneme=20)
+        print(f"Piper TTS dataset: {len(dataset)} samples ({NUM_PHONEMES} phonemes × 20 each)")
 
     dataloader = DataLoader(
         dataset,
@@ -160,35 +178,70 @@ def main():
     save_dir = Path(args.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    best_acc = 0.0
+    if args.phase == "production":
+        # Production phase training loop
+        best_match_rate = 0.0
 
-    try:
-        for epoch in range(args.epochs):
-            metrics = trainer.train_epoch(dataloader, verbose=False)
+        try:
+            for epoch in range(args.epochs):
+                metrics = trainer.train_production_epoch(dataloader, epoch)
 
-            print(f"Epoch {epoch+1:3d}: "
-                  f"loss={metrics['total_loss']:.4f}, "
-                  f"acc={metrics['phoneme_accuracy']:.1%}")
+                print(f"Epoch {epoch+1:3d}: "
+                      f"latent_loss={metrics['latent_loss']:.4f}, "
+                      f"match_rate={metrics['match_rate']:.1%}, "
+                      f"embed_loss={metrics['embed_loss']:.4f}")
 
-            # Save best model
-            if metrics['phoneme_accuracy'] > best_acc:
-                best_acc = metrics['phoneme_accuracy']
-                trainer.save_checkpoint(save_dir / "speech_best.pt")
+                # Save best model based on match rate
+                if metrics['match_rate'] > best_match_rate:
+                    best_match_rate = metrics['match_rate']
+                    trainer.save_checkpoint(save_dir / "speech_best.pt")
 
-            # Periodic save
-            if (epoch + 1) % 10 == 0:
-                trainer.save_checkpoint(save_dir / f"speech_epoch{epoch+1}.pt")
+                # Periodic save
+                if (epoch + 1) % 10 == 0:
+                    trainer.save_checkpoint(save_dir / f"speech_epoch{epoch+1}.pt")
 
-    except KeyboardInterrupt:
-        print("\n\nTraining interrupted.")
+        except KeyboardInterrupt:
+            print("\n\nTraining interrupted.")
 
-    # Save final
-    trainer.save_checkpoint(save_dir / "speech_final.pt")
+        # Save final
+        trainer.save_checkpoint(save_dir / "speech_final.pt")
 
-    print("-" * 60)
-    print(f"Training complete!")
-    print(f"Best accuracy: {best_acc:.1%}")
-    print(f"Checkpoints saved to: {save_dir}")
+        print("-" * 60)
+        print(f"Training complete!")
+        print(f"Best match rate: {best_match_rate:.1%}")
+        print(f"Checkpoints saved to: {save_dir}")
+
+    else:
+        # Classification phase training loop
+        best_acc = 0.0
+
+        try:
+            for epoch in range(args.epochs):
+                metrics = trainer.train_epoch(dataloader, verbose=False)
+
+                print(f"Epoch {epoch+1:3d}: "
+                      f"loss={metrics['total_loss']:.4f}, "
+                      f"acc={metrics['phoneme_accuracy']:.1%}")
+
+                # Save best model
+                if metrics['phoneme_accuracy'] > best_acc:
+                    best_acc = metrics['phoneme_accuracy']
+                    trainer.save_checkpoint(save_dir / "speech_best.pt")
+
+                # Periodic save
+                if (epoch + 1) % 10 == 0:
+                    trainer.save_checkpoint(save_dir / f"speech_epoch{epoch+1}.pt")
+
+        except KeyboardInterrupt:
+            print("\n\nTraining interrupted.")
+
+        # Save final
+        trainer.save_checkpoint(save_dir / "speech_final.pt")
+
+        print("-" * 60)
+        print(f"Training complete!")
+        print(f"Best accuracy: {best_acc:.1%}")
+        print(f"Checkpoints saved to: {save_dir}")
 
 
 if __name__ == "__main__":

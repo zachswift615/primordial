@@ -29,10 +29,18 @@ from .phonemes import (
     VOWELS,
     CONSONANTS,
 )
-from .encoders import MelSpectrogramEncoder, compute_mel_spectrogram
-from .heads import SpeechHead, SpeechSequenceHead, AudioReconstructionHead
+from .encoders import MelSpectrogramEncoder, CNNMelEncoder, compute_mel_spectrogram
+from .heads import SpeechHead, SpeechSequenceHead, AudioReconstructionHead, ProductionHead
 from .tts import TTSBackend, PiperTTS, DummyTTS, create_tts_backend
-from .training import SpeechLRN, PhonemeTrainer, PhonemeDataset, SyntheticPhonemeDataset
+from .training import SpeechLRN, PhonemeTrainer, ProductionTrainer, PhonemeDataset, SyntheticPhonemeDataset
+from .latent import (
+    PHONEME_ANCHORS,
+    LATENT_DIM,
+    get_anchor,
+    snap_to_nearest_anchor,
+    get_k_nearest_anchors,
+    interpret_latent,
+)
 
 __all__ = [
     # Config
@@ -48,12 +56,14 @@ __all__ = [
 
     # Encoders
     'MelSpectrogramEncoder',
+    'CNNMelEncoder',
     'compute_mel_spectrogram',
 
     # Heads
     'SpeechHead',
     'SpeechSequenceHead',
     'AudioReconstructionHead',
+    'ProductionHead',
 
     # TTS
     'TTSBackend',
@@ -64,6 +74,15 @@ __all__ = [
     # Training
     'SpeechLRN',
     'PhonemeTrainer',
+    'ProductionTrainer',
     'PhonemeDataset',
     'SyntheticPhonemeDataset',
+
+    # Latent space
+    'PHONEME_ANCHORS',
+    'LATENT_DIM',
+    'get_anchor',
+    'snap_to_nearest_anchor',
+    'get_k_nearest_anchors',
+    'interpret_latent',
 ]
