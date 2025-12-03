@@ -784,3 +784,160 @@ class ProductionTrainer:
         self.step_count = checkpoint['step_count']
         if 'current_babbling_ratio' in checkpoint:
             self.current_babbling_ratio = checkpoint['current_babbling_ratio']
+
+
+@dataclass
+class SequenceMetrics:
+    """Metrics from a sequence training step."""
+    total_loss: float
+    discrete_loss: float
+    latent_loss: float
+    accuracy: float
+    step: int
+
+
+class SequenceTrainer:
+    """Trainer for autoregressive phoneme sequence generation.
+
+    Uses teacher forcing with dual losses:
+    - Cross-entropy for discrete token prediction
+    - MSE for latent anchor prediction (masked to real phonemes)
+    """
+
+    def __init__(
+        self,
+        model,  # SpeechSequenceLRN
+        config: SpeechConfig,
+        device: str = "cpu",
+        lr: float = 1e-4,
+    ):
+        self.model = model.to(device)
+        self.config = config
+        self.device = device
+
+        self.optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+        self.step_count = 0
+
+        # Loss weights
+        self.discrete_weight = 1.0
+        self.latent_weight = 0.5
+
+    def _get_target_anchors(self, target_tokens: torch.Tensor) -> torch.Tensor:
+        """Get latent anchors for target token sequence.
+
+        Args:
+            target_tokens: (batch, seq_len) token indices
+
+        Returns:
+            (batch, seq_len, 6) anchor positions
+        """
+        from .latent import get_anchor, LATENT_DIM
+        from .phonemes import index_to_phoneme
+
+        batch, seq_len = target_tokens.shape
+        anchors = torch.zeros(batch, seq_len, LATENT_DIM, device=target_tokens.device)
+
+        for b in range(batch):
+            for t in range(seq_len):
+                token = target_tokens[b, t].item()
+                if token < 41:  # Real phoneme
+                    phoneme = index_to_phoneme(token)
+                    anchors[b, t] = get_anchor(phoneme)
+
+        return anchors
+
+    def _compute_accuracy(
+        self,
+        logits: torch.Tensor,
+        targets: torch.Tensor,
+        ignore_index: int = -100,
+    ) -> float:
+        """Compute token prediction accuracy."""
+        preds = logits.argmax(dim=-1)
+        mask = targets != ignore_index
+        if mask.sum() == 0:
+            return 0.0
+        correct = (preds == targets) & mask
+        return (correct.sum() / mask.sum()).item()
+
+    def train_step(
+        self,
+        mel: torch.Tensor,
+        input_tokens: torch.Tensor,
+        target_tokens: torch.Tensor,
+    ) -> dict:
+        """Single training step with teacher forcing.
+
+        Args:
+            mel: (batch, n_mels, n_frames) mel spectrogram
+            input_tokens: (batch, seq_len) input with SOS
+            target_tokens: (batch, seq_len) target with EOS
+
+        Returns:
+            Dict with loss values
+        """
+        from .latent import EOS_TOKEN
+
+        self.model.train()
+        mel = mel.to(self.device)
+        input_tokens = input_tokens.to(self.device)
+        target_tokens = target_tokens.to(self.device)
+
+        # Forward pass
+        discrete_logits, latent_pred = self.model(mel, input_tokens)
+
+        # Discrete loss (cross-entropy)
+        discrete_loss = F.cross_entropy(
+            discrete_logits.view(-1, discrete_logits.size(-1)),
+            target_tokens.view(-1),
+            ignore_index=EOS_TOKEN,  # Don't penalize EOS predictions harshly
+        )
+
+        # Latent loss (MSE, masked to real phonemes only)
+        target_anchors = self._get_target_anchors(target_tokens)
+        phoneme_mask = target_tokens < 41  # Real phonemes only
+
+        if phoneme_mask.sum() > 0:
+            latent_loss = F.mse_loss(
+                latent_pred[phoneme_mask],
+                target_anchors[phoneme_mask],
+            )
+        else:
+            latent_loss = torch.tensor(0.0, device=self.device)
+
+        # Combined loss
+        total_loss = self.discrete_weight * discrete_loss + self.latent_weight * latent_loss
+
+        # Backward pass
+        self.optimizer.zero_grad()
+        total_loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+        self.optimizer.step()
+
+        self.step_count += 1
+
+        # Accuracy
+        accuracy = self._compute_accuracy(discrete_logits, target_tokens)
+
+        return {
+            'total': total_loss.item(),
+            'discrete': discrete_loss.item(),
+            'latent': latent_loss.item() if isinstance(latent_loss, torch.Tensor) else latent_loss,
+            'accuracy': accuracy,
+            'step': self.step_count,
+        }
+
+    def save_checkpoint(self, path: str):
+        """Save model and optimizer state."""
+        torch.save({
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'step_count': self.step_count,
+        }, path)
+
+    def load_checkpoint(self, path: str):
+        """Load model and optimizer state."""
+        checkpoint = torch.load(path, map_location=self.device)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.step_count = checkpoint['step_count']
