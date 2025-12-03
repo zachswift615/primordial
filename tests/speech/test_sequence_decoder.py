@@ -1,8 +1,9 @@
 """Tests for autoregressive sequence decoder."""
 import torch
 import pytest
-from primordial.speech.sequence_decoder import SequenceDecoder
+from primordial.speech.sequence_decoder import SequenceDecoder, SpeechSequenceLRN
 from primordial.speech.config import SpeechConfig
+from primordial.speech.latent import SOS_TOKEN, EOS_TOKEN
 
 
 @pytest.fixture
@@ -76,3 +77,45 @@ def test_module_exports():
     assert SOS_TOKEN == 41
     assert EOS_TOKEN == 42
     assert TOTAL_VOCAB == 43
+
+
+@pytest.fixture
+def full_model(config):
+    return SpeechSequenceLRN(config)
+
+
+def test_full_model_init(full_model):
+    """Full model should have encoder and decoder."""
+    assert hasattr(full_model, 'encoder')
+    assert hasattr(full_model, 'decoder')
+
+
+def test_full_model_forward(full_model):
+    """Full model forward pass should work end-to-end."""
+    batch_size = 2
+    seq_len = 4
+
+    # Mel spectrogram input
+    mel = torch.randn(batch_size, 80, 64)
+    # Target tokens for teacher forcing
+    target_tokens = torch.randint(0, 41, (batch_size, seq_len))
+
+    discrete_logits, latent = full_model(mel, target_tokens)
+
+    assert discrete_logits.shape == (batch_size, seq_len, 43)
+    assert latent.shape == (batch_size, seq_len, 6)
+
+
+def test_full_model_generate(full_model):
+    """Generate should produce variable-length sequences."""
+    mel = torch.randn(1, 80, 64)
+
+    phonemes, latents = full_model.generate(mel, max_length=10)
+
+    assert isinstance(phonemes, list)
+    assert len(phonemes) <= 10
+    assert all(isinstance(p, str) for p in phonemes)
+    # Latents should match phoneme count
+    if latents is not None:
+        assert latents.shape[0] == len(phonemes)
+        assert latents.shape[1] == 6

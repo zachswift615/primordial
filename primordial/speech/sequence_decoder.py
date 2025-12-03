@@ -2,10 +2,12 @@
 import math
 import torch
 import torch.nn as nn
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 from .config import SpeechConfig
 from .latent import TOTAL_VOCAB, LATENT_DIM
+from .training import SpeechLRN
+from .phonemes import index_to_phoneme
 
 
 class SinusoidalPositionalEncoding(nn.Module):
@@ -138,3 +140,112 @@ class SequenceDecoder(nn.Module):
         latent = self.latent_head(output)
 
         return discrete_logits, latent
+
+
+class SpeechSequenceLRN(nn.Module):
+    """Full model: CNN Encoder + Fourier Mixing + Sequence Decoder.
+
+    Combines the existing speech encoder with the new autoregressive
+    decoder for word-level speech production.
+    """
+
+    def __init__(self, config: SpeechConfig):
+        super().__init__()
+        self.config = config
+
+        # Reuse existing encoder
+        self.encoder = SpeechLRN(config)
+
+        # New sequence decoder
+        self.decoder = SequenceDecoder(config)
+
+        # Token constants
+        from .latent import SOS_TOKEN, EOS_TOKEN
+        self.sos_token = SOS_TOKEN
+        self.eos_token = EOS_TOKEN
+
+    def encode(self, mel: torch.Tensor) -> torch.Tensor:
+        """Encode mel spectrogram to pooled features.
+
+        Args:
+            mel: (batch, 80, n_frames) mel spectrogram
+
+        Returns:
+            (batch, 384) pooled audio encoding
+        """
+        return self.encoder.encode(mel)
+
+    def forward(
+        self,
+        mel: torch.Tensor,
+        target_tokens: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Training forward pass with teacher forcing.
+
+        Args:
+            mel: (batch, 80, n_frames) mel spectrogram
+            target_tokens: (batch, seq_len) target phoneme indices
+
+        Returns:
+            discrete_logits: (batch, seq_len, 43)
+            latent: (batch, seq_len, 6)
+        """
+        pooled = self.encode(mel)
+        return self.decoder(target_tokens, memory=pooled)
+
+    @torch.no_grad()
+    def generate(
+        self,
+        mel: torch.Tensor,
+        max_length: int = 15,
+        temperature: float = 0.0,
+    ) -> Tuple[List[str], Optional[torch.Tensor]]:
+        """Autoregressive phoneme sequence generation.
+
+        Args:
+            mel: (1, 80, n_frames) single mel spectrogram
+            max_length: Maximum phonemes to generate
+            temperature: Sampling temperature (0 = greedy)
+
+        Returns:
+            phonemes: List[str] - generated phoneme sequence
+            latents: (seq_len, 6) - latent vectors, or None if empty
+        """
+        device = mel.device
+        pooled = self.encode(mel)  # (1, 384)
+
+        # Start with SOS
+        generated_tokens = [self.sos_token]
+        generated_latents = []
+
+        for _ in range(max_length):
+            # Prepare input
+            input_ids = torch.tensor([generated_tokens], device=device)
+
+            # Decode
+            discrete_logits, latent_pred = self.decoder(input_ids, memory=pooled)
+
+            # Get prediction from last position
+            next_logits = discrete_logits[0, -1]  # (43,)
+            next_latent = latent_pred[0, -1]      # (6,)
+
+            # Sample or greedy
+            if temperature == 0:
+                next_token = next_logits.argmax().item()
+            else:
+                import torch.nn.functional as F
+                probs = F.softmax(next_logits / temperature, dim=-1)
+                next_token = torch.multinomial(probs, 1).item()
+
+            # Stop on EOS
+            if next_token == self.eos_token:
+                break
+
+            generated_tokens.append(next_token)
+            generated_latents.append(next_latent)
+
+        # Convert to phoneme strings (skip SOS)
+        phonemes = [index_to_phoneme(t) for t in generated_tokens[1:]]
+        latents = torch.stack(generated_latents) if generated_latents else None
+
+        return phonemes, latents
