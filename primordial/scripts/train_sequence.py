@@ -56,6 +56,14 @@ def parse_args():
         help="Resume from checkpoint"
     )
     parser.add_argument(
+        "--encoder-checkpoint", type=str, default=None,
+        help="Load pretrained encoder weights (e.g., from production training)"
+    )
+    parser.add_argument(
+        "--freeze-encoder", action="store_true",
+        help="Freeze encoder weights, only train decoder"
+    )
+    parser.add_argument(
         "--no-audio", action="store_true",
         help="Disable audio playback"
     )
@@ -115,7 +123,36 @@ def main():
     trainer = SequenceTrainer(model, config, lr=args.lr)
     tts = create_tts_backend(config)
 
-    # Load checkpoint if provided
+    # Load pretrained encoder if provided
+    if args.encoder_checkpoint:
+        print(f"Loading pretrained encoder: {args.encoder_checkpoint}")
+        checkpoint = torch.load(args.encoder_checkpoint, map_location='cpu')
+
+        # Handle different checkpoint formats
+        if 'model_state_dict' in checkpoint:
+            state_dict = checkpoint['model_state_dict']
+        else:
+            state_dict = checkpoint
+
+        # Extract encoder weights (the SpeechLRN inside SpeechSequenceLRN)
+        # The production checkpoint has keys like 'audio_encoder.*', 'mixing_layers.*', etc.
+        # SpeechSequenceLRN.encoder is a SpeechLRN, so we load directly
+        encoder_state = {}
+        for k, v in state_dict.items():
+            # Skip production-specific heads
+            if k.startswith('production_head.') or k.startswith('speech_head.'):
+                continue
+            encoder_state[k] = v
+
+        model.encoder.load_state_dict(encoder_state, strict=False)
+        print(f"  Loaded encoder weights ({len(encoder_state)} tensors)")
+
+        if args.freeze_encoder:
+            for param in model.encoder.parameters():
+                param.requires_grad = False
+            print("  Encoder frozen - only training decoder")
+
+    # Load full checkpoint if provided (for resuming training)
     if args.checkpoint:
         print(f"Loading checkpoint: {args.checkpoint}")
         trainer.load_checkpoint(args.checkpoint)
