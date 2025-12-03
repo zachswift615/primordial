@@ -887,15 +887,18 @@ class SequenceTrainer:
         discrete_logits, latent_pred = self.model(mel, input_tokens)
 
         # Discrete loss (cross-entropy)
+        # Target uses -100 for padding positions (standard PyTorch ignore_index)
+        # EOS tokens in target are NOT ignored - model must learn to predict them!
         discrete_loss = F.cross_entropy(
             discrete_logits.view(-1, discrete_logits.size(-1)),
             target_tokens.view(-1),
-            ignore_index=EOS_TOKEN,  # Don't penalize EOS predictions harshly
+            ignore_index=-100,  # Ignore padding only, not EOS
         )
 
         # Latent loss (MSE, masked to real phonemes only)
         target_anchors = self._get_target_anchors(target_tokens)
-        phoneme_mask = target_tokens < 41  # Real phonemes only
+        # Real phonemes are 0-40, exclude EOS (42), SOS (41), and padding (-100)
+        phoneme_mask = (target_tokens >= 0) & (target_tokens < 41)
 
         if phoneme_mask.sum() > 0:
             latent_loss = F.mse_loss(

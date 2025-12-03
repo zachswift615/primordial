@@ -196,13 +196,17 @@ def main():
 
         # Custom collate for variable-length sequences
         def collate_fn(batch):
+            from primordial.speech.latent import EOS_TOKEN, SOS_TOKEN
+
             mels, inputs, targets, words = zip(*batch)
 
             # Pad sequences to max length in batch
             max_len = max(len(t) for t in inputs)
 
-            padded_inputs = torch.zeros(len(batch), max_len, dtype=torch.long)
-            padded_targets = torch.zeros(len(batch), max_len, dtype=torch.long)
+            # Pad inputs with EOS (after the real sequence)
+            # Pad targets with -100 (ignore_index for cross-entropy)
+            padded_inputs = torch.full((len(batch), max_len), EOS_TOKEN, dtype=torch.long)
+            padded_targets = torch.full((len(batch), max_len), -100, dtype=torch.long)
 
             for i, (inp, tgt) in enumerate(zip(inputs, targets)):
                 padded_inputs[i, :len(inp)] = inp
