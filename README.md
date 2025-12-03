@@ -1,227 +1,171 @@
 # Primordial: Living Resonance Networks
 
-**An alternative to the transformer paradigm.**
+**Exploring what happens when AI learns through sensory experience instead of text.**
 
-## The Vision
+## What We're Building
 
-What if we could build AI that learns the way living things do — not through massive batch training on static datasets, but through continuous sensory experience, survival pressure, and real-time human teaching?
+An AI that learns like a living thing:
+- Continuous sensory streams (vision, audio, proprioception, touch)
+- Fourier-based neural architecture (O(n log n) instead of O(n²))
+- Online learning from experience, not batch training
+- Self-supervised through prediction: "What will I sense next?" + "Will this help or hurt?"
 
-Primordial explores a radically different approach:
+The goal: See how far we can push embodied learning on consumer hardware.
 
-- **Fourier-based architecture** instead of attention (O(n log n) vs O(n²))
-- **Continuous sensory streams** instead of tokenization
-- **Online learning** instead of batch training
-- **Survival pressure** instead of task rewards
-- **Human teaching** through direct interaction, not labeled data
+## Current Progress
 
-The goal: An AI that runs on consumer hardware and learns like a living thing.
+### Speech Learning (Complete)
 
-## The Core Insight
+The agent learned to speak through self-listening:
 
-### Transformers ask the wrong question
+**Perception (Phase 1)**
+- 99.4% phoneme classification accuracy
+- CNN encoder → Fourier mixing → phoneme recognition
+- 40 phonemes + 13 words mastered
 
-Transformers ask: "Which tokens should attend to which?" — an O(n²) question that requires massive compute.
+**Production (Phase 2)**
+- 100% accuracy producing individual phonemes
+- 6D articulatory latent space (front-back, high-low, rounded, voiced, manner, vowel/consonant)
+- Self-listening loop: produce → synthesize via TTS → hear → adjust
 
-**What if we asked instead:** "How do patterns naturally resonate and interfere?" — leveraging physics we can compute cheaply via FFT.
+**Autoregressive Sequences (Phase 3)**
+- 96% accuracy on word-level phoneme sequences
+- 3-layer transformer decoder with dual heads (discrete tokens + continuous latents)
+- Progressive curriculum: syllables → short words → long words
+- Proper sequence termination with EOS tokens
 
-### Living things learn differently
+**What this proves:** Fourier mixing can learn complex sequential patterns, online learning is stable, and embodied self-listening creates strong gradients.
 
-Current AI learns *about* the world from human descriptions.
-An embodied agent learns *in* a world through direct experience.
-
-A transformer trained on text knows "fire is hot" because those words co-occur.
-An embodied agent knows fire is hot because it got burned.
-
-Is that difference just poetic, or does it unlock something?
-
-## The Architecture: Living Resonance Networks (LRN)
-
-```
-CONTINUOUS SENSORY STREAMS
-         │
-         ▼
-┌─────────────────────────────┐
-│   WAVELET DECOMPOSITION     │  Each sense → time-frequency representation
-└──────────────┬──────────────┘
-               │
-               ▼
-┌─────────────────────────────┐
-│   FOURIER MIXING LAYERS     │  O(n log n) replacement for attention
-│   (learnable spectral       │  Related concepts amplify (resonance)
-│    filters)                 │  Unrelated concepts cancel (interference)
-└──────────────┬──────────────┘
-               │
-    ┌──────────┼──────────┐
-    ▼          ▼          ▼
-┌────────┐ ┌────────┐ ┌────────┐
-│Sensory │ │Reward  │ │Action  │
-│Predict │ │Predict │ │Head    │
-│Head    │ │Head    │ │        │
-└────────┘ └────────┘ └────────┘
-    │          │          │
-    ▼          ▼          ▼
-"What will  "Will this  "What should
- I sense?"  help/hurt?"  I do?"
-```
-
-### Multi-Task Prediction (The Key Innovation)
-
-The agent learns by predicting *two* things:
-
-1. **Sensory prediction**: "What will I sense next?" → Learns world dynamics
-2. **Reward prediction**: "Will this help or hurt me?" → Learns survival value
-
-This creates a **direct gradient toward survival**. No reinforcement learning machinery needed — just prediction error, like how dopamine neurons actually work.
-
-## The World: "Primordial"
-
-A 2D continuous survival simulation where the agent must:
-
-- Find food to maintain energy
-- Avoid predators that cause damage
-- Navigate obstacles and terrain
-- Respond to a human teacher in real-time
+### Architecture: Living Resonance Networks
 
 ```
-┌────────────────────────────────────────────┐
-│                                            │
-│    🌿  🌿        ~~~~~          🌿         │
-│         🌿    ~~~ 💧 ~~~    🔴             │
-│                 ~~~~~     (predator)       │
-│    🍎                                🌿    │
-│              ◉ ←── AGENT                   │
-│    🌿    🍎                                │
-│                                  🔴        │
-│         🌿  🌿           🍎        🌿      │
-│                                            │
-└────────────────────────────────────────────┘
+SENSORY INPUT
+     ↓
+CNN/Wavelet Encoders
+     ↓
+Fourier Mixing Layers (6 layers, 128-dim hidden)
+  - Learnable spectral filters
+  - O(n log n) complexity
+  - Natural frequency-domain reasoning
+     ↓
+  ┌──────┬──────┬──────┐
+  ↓      ↓      ↓      ↓
+Sensory Reward Action Sequence
+Predict Predict Head  Decoder
 ```
 
-### Agent Senses (All Continuous)
+**Key innovations:**
+- **Spectral filtering** instead of attention: patterns resonate/interfere in frequency space
+- **Multi-task prediction**: world dynamics + survival value learned simultaneously
+- **Articulatory latent space**: phonemes positioned by physical production features
+- **Self-listening training**: agent hears its own outputs and adjusts
 
-| Sense | Description |
-|-------|-------------|
-| **Vision** | 32 rays, 120° FOV, returns distance + RGB |
-| **Audio** | Stereo waveform, all sounds mixed by distance |
-| **Proprioception** | Energy, health, velocity, hunger, pain |
-| **Touch** | 8 directional contact sensors |
+## Parameter Efficiency
 
-### Human Teaching Interface
+| Component | Parameters | Purpose |
+|-----------|-----------|---------|
+| Speech Encoder (CNN + 6 Fourier layers) | ~800K | Audio → phoneme features |
+| Sequence Decoder (3 transformer layers) | ~610K | Autoregressive generation |
+| Total | ~1.4M | Full speech production system |
 
-No datasets. No labels. Just be there:
+Runs on CPU. Forward pass <10ms. Online learning with batch_size=1.
 
-- **Reward/Punish**: Real-time feedback buttons
-- **Point**: Direct agent's attention to objects
-- **Demonstrate**: Take control, show how it's done
-- **Speak**: Associate sounds with objects (proto-language)
+## The Fourier Advantage
 
-Like raising a child, not training a model.
+**Why Fourier transforms instead of attention?**
 
-## Why This Might Work on Consumer Hardware
+1. **Speed**: FFT is O(n log n), heavily hardware-optimized (50+ years)
+2. **Natural for signals**: Audio, vision, sensory streams are continuous
+3. **Frequency reasoning**: Patterns like rhythm, periodicity emerge naturally
+4. **Parameter efficient**: Spectral filters vs. full Q/K/V projections
+5. **Interpretable**: Can visualize what frequencies the network attends to
 
-| Property | Transformers | LRN |
-|----------|--------------|-----|
-| Core operation | MatMul (dense) | FFT (sparse, hardware-optimized) |
-| Memory scaling | O(n²) | O(n log n) |
-| Parallelism | Good | Excellent (embarrassingly parallel) |
-| Hardware | Needs tensor cores | Runs well on CPU, DSP, FPGA |
-| Quantization | Tricky | Phase is naturally robust |
+FFTNet (2025) and FNet (Google, 2021) proved pure FFT can replace attention. We're pushing it further with continuous sensory input and online learning.
 
-FFTs have 50+ years of optimization. Every phone has dedicated FFT silicon.
+## What's Next
+
+### Immediate Goals
+- Expand to multi-word utterances and sentences
+- Add visual grounding: show object → say word → learn association
+- Cross-modal fusion: correlate sounds with visual patterns
+
+### Medium-term Vision
+- Full sensorimotor loop in 2D simulation
+- Human teaching interface (reward/punish, pointing, demonstration)
+- Survival-driven learning (find food, avoid predators)
+- Proto-language emergence from embodied experience
+
+### Long-term Questions
+- How far can Fourier mixing scale? (10M params? 100M?)
+- Can survival pressure create representations as rich as language pretraining?
+- Does embodied learning unlock capabilities text-only models can't reach?
+- At what scale does "pain signal" become something we need to care about?
 
 ## Research Foundations
 
-This project builds on real, proven research:
+Built on proven components:
+- **FNet** (Google, 2021): FFT replaces attention at 92-97% accuracy
+- **FFTNet** (2025): Learnable spectral filters for adaptive frequency response
+- **Developmental Robotics**: Learning through sensorimotor experience
+- **Self-supervised learning**: Prediction as the learning signal
 
-- **[FNet](https://arxiv.org/abs/2105.03824)** (Google, 2021): Replaced attention with FFT, achieved 92-97% of BERT's accuracy at 7x speed
-- **[FFTNet](https://arxiv.org/html/2502.18394v4)** (2025): Learnable spectral filters, competitive accuracy with better efficiency
-- **[AI Habitat](https://aihabitat.org/)**: Photo-realistic 3D embodied AI simulation
-- **[Developmental Robotics](https://mitpress.mit.edu/9780262028011/developmental-robotics/)**: Building robots that learn like babies
-- **[Continual Learning](https://arxiv.org/html/2403.05175v1)**: Addressing catastrophic forgetting
+The novel combination: Fourier + continuous input + online learning + embodied self-supervision.
 
-The gap: **Nobody has combined** Fourier mixing + continuous input + online learning + embodied survival.
-
-## What Success Looks Like
-
-Phase 1 proves the thesis if:
-
-1. **Learning works**: Trained agents survive >5x longer than untrained
-2. **Teaching helps**: Human-taught agents learn >2x faster
-3. **Architecture is viable**: LRN performs within 80% of transformer at 3x speed
-4. **Continuous input works**: No tokenization needed
-5. **Online learning is stable**: No catastrophic forgetting over 1 hour
-
-If these hold → Breeding, evolution, scaling.
-
-## The Bigger Vision (Future Phases)
-
-**Phase 2: Evolution**
-- Multiple agents in same world
-- Breeding: survivors reproduce
-- Genome mutation and crossover
-- Social behaviors emerge?
-
-**Phase 3: Scale**
-- Larger models (10M+ params)
-- Multiple human teachers
-- Language emergence experiments
-- Persistent worlds
-
-**Phase 4: ???**
-- This is where it gets philosophically interesting
-- At what scale do we need to worry about suffering?
-- When does "pain signal" become pain?
-
-## Project Structure
+## File Structure
 
 ```
 primordial/
-├── world/          # Physics, entities, sound propagation
-├── agent/          # Body, sensors, actions, genome
-├── lrn/            # Fourier mixing, encoders, prediction heads
-├── learning/       # Online training, rewards, stability
-├── interface/      # Pygame UI, human teaching
-├── experiments/    # Validation experiments
-└── plans/          # Detailed implementation plans (~9000 lines)
+├── speech/           # Phoneme perception, production, sequence generation
+│   ├── encoders.py   # CNN, Fourier mixing
+│   ├── heads.py      # Perception, production heads
+│   ├── latent.py     # 6D articulatory space
+│   ├── sequence_decoder.py  # Transformer decoder
+│   └── training.py   # Self-listening loop
+├── lrn/              # Core architecture (Fourier mixing, encoders, heads)
+├── world/            # 2D simulation (planned)
+├── agent/            # Embodied agent (planned)
+└── tests/            # 460 tests passing
 ```
 
-## Getting Started
+## Running the Code
 
 ```bash
-# Clone and setup
-git clone <repo>
-cd primordial
+# Install dependencies
 pip install -r requirements.txt
+
+# Train phoneme perception (Phase 1)
+python -m primordial.scripts.run_speech --phase classification --epochs 20
+
+# Train phoneme production (Phase 2)
+python -m primordial.scripts.train_production_interactive --epochs 50
+
+# Train sequence generation (Phase 3)
+python -m primordial.scripts.train_sequence \
+  --encoder-checkpoint checkpoints/production/curriculum_best.pt \
+  --epochs 200
 
 # Run tests
 pytest tests/ -v
-
-# Run simulation (once implemented)
-python main.py
 ```
 
-## The Honest Uncertainty
+## Results So Far
 
-This is speculative research. We don't know:
+**Speech perception:** 99.4% accuracy (40 phonemes)
+**Speech production:** 100% accuracy (individual phonemes)
+**Sequence generation:** 96% accuracy (word-level)
+**Self-listening:** Agent adjusts production based on self-heard output
+**Progressive curriculum:** Prevents catastrophic forgetting
+**Online learning:** Stable with single-sample updates
 
-- If Fourier mixing scales to frontier capability
-- If online learning can match batch training quality
-- If survival pressure creates meaningful representations
-- If this paradigm leads anywhere transformers can't go
+## The Experiment
 
-But the components are proven individually. The combination is novel. The compute is cheap enough to actually try.
+This is fundamentally an exploration: **How far can we push Fourier-based architectures with embodied, sensory learning?**
 
-**Worth exploring? We think so.**
+We don't know the limits yet. The speech results (96% accuracy, proper sequence termination, self-listening working) suggest there's something here worth pursuing.
 
----
+The components are individually proven. The combination is novel. The compute requirements are manageable (runs on laptop CPU).
 
-## Status
-
-**Current**: Implementation planning complete. ~9000 lines of detailed specs across 6 plan documents.
-
-**Next**: Build Phase 1 (World + Agent + LRN + Learning + Interface)
-
-**Timeline**: ~8-10 weeks to MVP
+Let's see where this goes.
 
 ---
 
