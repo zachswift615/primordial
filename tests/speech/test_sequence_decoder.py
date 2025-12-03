@@ -66,3 +66,13 @@ def test_causal_mask_shape(decoder):
     assert mask[0, 0] == False
     assert mask[4, 0] == False
     assert mask[4, 4] == False
+
+
+def test_module_exports():
+    """SequenceDecoder should be importable from speech module."""
+    from primordial.speech import SequenceDecoder, SOS_TOKEN, EOS_TOKEN, TOTAL_VOCAB
+
+    assert SequenceDecoder is not None
+    assert SOS_TOKEN == 41
+    assert EOS_TOKEN == 42
+    assert TOTAL_VOCAB == 43

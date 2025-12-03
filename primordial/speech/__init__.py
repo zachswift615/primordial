@@ -33,6 +33,7 @@ from .encoders import MelSpectrogramEncoder, CNNMelEncoder, compute_mel_spectrog
 from .heads import SpeechHead, SpeechSequenceHead, AudioReconstructionHead, ProductionHead
 from .tts import TTSBackend, PiperTTS, DummyTTS, create_tts_backend
 from .training import SpeechLRN, PhonemeTrainer, ProductionTrainer, PhonemeDataset, SyntheticPhonemeDataset
+from .sequence_decoder import SequenceDecoder, SinusoidalPositionalEncoding
 from .latent import (
     PHONEME_ANCHORS,
     LATENT_DIM,
@@ -40,6 +41,9 @@ from .latent import (
     snap_to_nearest_anchor,
     get_k_nearest_anchors,
     interpret_latent,
+    SOS_TOKEN,
+    EOS_TOKEN,
+    TOTAL_VOCAB,
 )
 
 __all__ = [
@@ -85,4 +89,11 @@ __all__ = [
     'snap_to_nearest_anchor',
     'get_k_nearest_anchors',
     'interpret_latent',
+
+    # Sequence decoder
+    'SequenceDecoder',
+    'SinusoidalPositionalEncoding',
+    'SOS_TOKEN',
+    'EOS_TOKEN',
+    'TOTAL_VOCAB',
 ]
