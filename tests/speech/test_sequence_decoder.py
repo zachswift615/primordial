@@ -119,3 +119,21 @@ def test_full_model_generate(full_model):
     if latents is not None:
         assert latents.shape[0] == len(phonemes)
         assert latents.shape[1] == 6
+
+
+def test_all_exports():
+    """All new components should be importable."""
+    from primordial.speech import (
+        SequenceDecoder,
+        SpeechSequenceLRN,
+        SequenceTrainer,
+        WordDataset,
+        WORD_PHONEMES,
+        SOS_TOKEN,
+        EOS_TOKEN,
+        TOTAL_VOCAB,
+    )
+    assert all([
+        SequenceDecoder, SpeechSequenceLRN, SequenceTrainer,
+        WordDataset, WORD_PHONEMES
+    ])

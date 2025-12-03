@@ -32,8 +32,9 @@ from .phonemes import (
 from .encoders import MelSpectrogramEncoder, CNNMelEncoder, compute_mel_spectrogram
 from .heads import SpeechHead, SpeechSequenceHead, AudioReconstructionHead, ProductionHead
 from .tts import TTSBackend, PiperTTS, DummyTTS, create_tts_backend
-from .training import SpeechLRN, PhonemeTrainer, ProductionTrainer, PhonemeDataset, SyntheticPhonemeDataset
-from .sequence_decoder import SequenceDecoder, SinusoidalPositionalEncoding
+from .training import SpeechLRN, PhonemeTrainer, ProductionTrainer, PhonemeDataset, SyntheticPhonemeDataset, SequenceTrainer
+from .sequence_decoder import SequenceDecoder, SpeechSequenceLRN, SinusoidalPositionalEncoding
+from .word_dataset import WordDataset, WORD_PHONEMES
 from .latent import (
     PHONEME_ANCHORS,
     LATENT_DIM,
@@ -81,6 +82,7 @@ __all__ = [
     'ProductionTrainer',
     'PhonemeDataset',
     'SyntheticPhonemeDataset',
+    'SequenceTrainer',
 
     # Latent space
     'PHONEME_ANCHORS',
@@ -92,8 +94,13 @@ __all__ = [
 
     # Sequence decoder
     'SequenceDecoder',
+    'SpeechSequenceLRN',
     'SinusoidalPositionalEncoding',
     'SOS_TOKEN',
     'EOS_TOKEN',
     'TOTAL_VOCAB',
+
+    # Word dataset
+    'WordDataset',
+    'WORD_PHONEMES',
 ]
