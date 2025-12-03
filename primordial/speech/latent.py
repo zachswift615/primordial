@@ -26,6 +26,11 @@ VOICED = 3
 MANNER = 4
 VOWEL_CONS = 5
 
+# Sequence tokens (for autoregressive decoder)
+SOS_TOKEN = 41  # Start of sequence
+EOS_TOKEN = 42  # End of sequence (also used as PAD)
+TOTAL_VOCAB = 43  # 41 phonemes + SOS + EOS
+
 # Phoneme anchor positions in the 6D latent space
 # Format: [front-back, high-low, rounded, voiced, manner, vowel-cons]
 # Range: -1.0 to 1.0 for each dimension
@@ -110,6 +115,10 @@ PHONEME_ANCHORS: Dict[str, List[float]] = {
     # --- SPECIAL ---
     'SIL': [ 0.0,  0.0,  0.0,  0.0,  0.0,  0.0],  # silence - origin
     'UNK': [ 0.0,  0.0,  0.0,  0.0,  0.0,  0.0],  # unknown - origin
+
+    # ============= SEQUENCE TOKENS =============
+    'SOS': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],  # Start of sequence - origin
+    'EOS': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],  # End of sequence - origin
 }
 
 # Pre-compute tensor anchors for efficient distance calculations
