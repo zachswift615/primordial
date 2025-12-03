@@ -180,7 +180,7 @@ def main():
     if args.phase:
         phases = [args.phase]
     else:
-        phases = [1, 2, 3]
+        phases = list(CURRICULUM.keys())  # All phases (1, 2, 3, 4)
 
     best_accuracy = 0.0
     total_epochs = 0
