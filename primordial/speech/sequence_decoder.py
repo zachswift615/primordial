@@ -198,19 +198,25 @@ class SpeechSequenceLRN(nn.Module):
         self,
         mel: torch.Tensor,
         max_length: int = 15,
+        min_length: int = 0,
         temperature: float = 0.0,
+        eos_penalty: float = 0.0,
     ) -> Tuple[List[str], Optional[torch.Tensor]]:
         """Autoregressive phoneme sequence generation.
 
         Args:
             mel: (1, 80, n_frames) single mel spectrogram
             max_length: Maximum phonemes to generate
+            min_length: Minimum phonemes before allowing EOS (prevents early stopping)
             temperature: Sampling temperature (0 = greedy)
+            eos_penalty: Negative bias applied to EOS logit (discourages early stopping)
 
         Returns:
             phonemes: List[str] - generated phoneme sequence
             latents: (seq_len, 6) - latent vectors, or None if empty
         """
+        import torch.nn.functional as F
+
         device = mel.device
         pooled = self.encode(mel)  # (1, 384)
 
@@ -218,7 +224,7 @@ class SpeechSequenceLRN(nn.Module):
         generated_tokens = [self.sos_token]
         generated_latents = []
 
-        for _ in range(max_length):
+        for step in range(max_length):
             # Prepare input
             input_ids = torch.tensor([generated_tokens], device=device)
 
@@ -226,14 +232,21 @@ class SpeechSequenceLRN(nn.Module):
             discrete_logits, latent_pred = self.decoder(input_ids, memory=pooled)
 
             # Get prediction from last position
-            next_logits = discrete_logits[0, -1]  # (43,)
-            next_latent = latent_pred[0, -1]      # (6,)
+            next_logits = discrete_logits[0, -1].clone()  # (43,)
+            next_latent = latent_pred[0, -1]              # (6,)
+
+            # Apply EOS penalty to discourage early stopping
+            if eos_penalty != 0.0:
+                next_logits[self.eos_token] += eos_penalty
+
+            # Block EOS until min_length is reached
+            if step < min_length:
+                next_logits[self.eos_token] = float('-inf')
 
             # Sample or greedy
             if temperature == 0:
                 next_token = next_logits.argmax().item()
             else:
-                import torch.nn.functional as F
                 probs = F.softmax(next_logits / temperature, dim=-1)
                 next_token = torch.multinomial(probs, 1).item()
 

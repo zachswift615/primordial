@@ -71,7 +71,7 @@ def parse_args():
     return parser.parse_args()
 
 
-# Curriculum phases
+# Curriculum phases (total: 30 + 30 + 40 + 60 = 160 epochs)
 CURRICULUM = {
     1: {
         'max_phonemes': 3,
@@ -86,8 +86,14 @@ CURRICULUM = {
         'temperature': 0.5,
     },
     3: {
-        'max_phonemes': 10,
+        'max_phonemes': 7,
         'epochs': 40,
+        'self_listen_ratio': 0.2,
+        'temperature': 0.5,
+    },
+    4: {
+        'max_phonemes': 12,
+        'epochs': 60,
         'self_listen_ratio': 0.3,
         'temperature': 0.7,
     },
