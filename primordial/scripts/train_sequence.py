@@ -117,8 +117,18 @@ def main():
     print("=" * 60)
     print()
 
-    # Setup
-    config = SpeechConfig(encoder_type='cnn', tts_backend='piper')
+    # Setup - find Piper voice model
+    piper_voice = Path.home() / ".claude-tts/voices/en_US-lessac-medium/en_US-lessac-medium.onnx"
+    if not piper_voice.exists():
+        print(f"Warning: Piper voice not found at {piper_voice}")
+        print("Training will use DummyTTS (random noise). Results will be poor.")
+        piper_voice = ""
+
+    config = SpeechConfig(
+        encoder_type='cnn',
+        tts_backend='piper',
+        tts_model_path=str(piper_voice),
+    )
     model = SpeechSequenceLRN(config)
     trainer = SequenceTrainer(model, config, lr=args.lr)
     tts = create_tts_backend(config)
