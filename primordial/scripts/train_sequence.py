@@ -67,6 +67,10 @@ def parse_args():
         "--no-audio", action="store_true",
         help="Disable audio playback"
     )
+    parser.add_argument(
+        "--acoustic-check-interval", type=int, default=10,
+        help="Compute acoustic match every N batches (default: 10)"
+    )
 
     return parser.parse_args()
 
@@ -122,9 +126,10 @@ def main():
     # Import after args to avoid slow startup for --help
     from primordial.speech import SpeechConfig, create_tts_backend
     from primordial.speech.sequence_decoder import SpeechSequenceLRN
-    from primordial.speech.training import SequenceTrainer
-    from primordial.speech.word_dataset import WordDataset, WORD_PHONEMES
+    from primordial.speech.training import SequenceTrainer, compute_acoustic_match
+    from primordial.speech.word_dataset import WordDataset, WORD_PHONEMES, get_all_entries
     from torch.utils.data import DataLoader
+    import numpy as np
 
     print("=" * 60)
     print("Sequence Decoder Training")
@@ -210,7 +215,11 @@ def main():
         print(f"{'='*60}")
 
         # Create dataset for this phase
-        dataset = WordDataset(config, max_phonemes=phase['max_phonemes'])
+        dataset = WordDataset(
+            config,
+            max_phonemes=phase['max_phonemes'],
+            include_phrases=phase.get('include_phrases', False),
+        )
         print(f"Words in phase: {len(dataset)}")
 
         # Custom collate for variable-length sequences
@@ -244,27 +253,62 @@ def main():
         for epoch in range(phase_epochs):
             total_epochs += 1
             epoch_losses = {'total': 0, 'discrete': 0, 'latent': 0, 'accuracy': 0}
+            acoustic_scores = []
             num_batches = 0
 
-            for mel, input_tokens, target_tokens, words in dataloader:
+            for batch_idx, (mel, input_tokens, target_tokens, words) in enumerate(dataloader):
                 losses = trainer.train_step(mel, input_tokens, target_tokens)
 
                 for k in epoch_losses:
                     epoch_losses[k] += losses.get(k, 0)
                 num_batches += 1
 
+                # Periodic acoustic match check
+                if batch_idx % args.acoustic_check_interval == 0:
+                    model.eval()
+                    with torch.no_grad():
+                        # Check first sample in batch
+                        sample_mel = mel[0:1]
+                        generated, _ = model.generate(sample_mel, temperature=phase['temperature'])
+
+                        # Get target audio for this word
+                        word = words[0]
+                        all_entries = get_all_entries(include_phrases=True)
+                        target_phonemes = all_entries.get(word, [])
+                        target_audio = tts.synthesize_phonemes(target_phonemes)
+
+                        # Compute acoustic match
+                        if generated and len(generated) > 0:
+                            score = compute_acoustic_match(
+                                model, tts, config, generated, target_audio
+                            )
+                        else:
+                            score = 0.0  # Failed generation
+
+                        acoustic_scores.append(score)
+                    model.train()
+
             # Average
             for k in epoch_losses:
                 epoch_losses[k] /= max(num_batches, 1)
 
-            # Save best
-            if epoch_losses['accuracy'] > best_accuracy:
-                best_accuracy = epoch_losses['accuracy']
+            avg_acoustic = np.mean(acoustic_scores) if acoustic_scores else 0.0
+
+            # Divergence warning
+            if epoch_losses['accuracy'] > 0.9 and avg_acoustic < 0.5:
+                print(f"  WARNING: High token accuracy ({epoch_losses['accuracy']:.1%}) "
+                      f"but low acoustic match ({avg_acoustic:.2f})")
+
+            # Save best (based on combined score)
+            combined_score = epoch_losses['accuracy'] * 0.7 + avg_acoustic * 0.3
+            if combined_score > best_accuracy:
+                best_accuracy = combined_score
                 torch.save(model.state_dict(), save_dir / "sequence_best.pt")
 
             print(f"Epoch {total_epochs:3d} (P{phase_num}): "
                   f"loss={epoch_losses['total']:.4f}, "
-                  f"acc={epoch_losses['accuracy']:.1%}")
+                  f"acc={epoch_losses['accuracy']:.1%}, "
+                  f"acoustic={avg_acoustic:.2f}")
 
             # Demo
             if (epoch + 1) % args.demo_every == 0:
@@ -300,6 +344,19 @@ def main():
                         print("done")
 
                 model.train()
+
+            # Check phase advancement (dual gating)
+            token_gate = phase.get('token_threshold', 0.0)
+            acoustic_gate = phase.get('acoustic_threshold', 0.0)
+
+            if (token_gate > 0 and acoustic_gate > 0 and
+                epoch_losses['accuracy'] >= token_gate and
+                avg_acoustic >= acoustic_gate):
+                print(f"\n  Phase {phase_num} gates passed! "
+                      f"(acc={epoch_losses['accuracy']:.1%} >= {token_gate:.0%}, "
+                      f"acoustic={avg_acoustic:.2f} >= {acoustic_gate:.2f})")
+                print(f"  Advancing to next phase...\n")
+                break  # Exit epoch loop, advance to next phase
 
     # Final results
     print(f"\n{'='*60}")
