@@ -21,7 +21,7 @@ The agent learned to speak through self-listening:
 **Perception (Phase 1)**
 - 99.4% phoneme classification accuracy
 - CNN encoder → Fourier mixing → phoneme recognition
-- 40 phonemes + 13 words mastered
+- 40 phonemes mastered
 
 **Production (Phase 2)**
 - 100% accuracy producing individual phonemes
@@ -34,7 +34,14 @@ The agent learned to speak through self-listening:
 - Progressive curriculum: syllables → short words → long words
 - Proper sequence termination with EOS tokens
 
-**What this proves:** Fourier mixing can learn complex sequential patterns, online learning is stable, and embodied self-listening creates strong gradients.
+**Multi-Word Phrases (Phase 4)** *(New!)*
+- **98% accuracy** on multi-word phrases and sentences
+- 106 entries: single words + 55 hand-curated phrases
+- Dual-gated curriculum: token accuracy AND acoustic similarity must pass
+- Self-listening validation confirms productions actually sound correct
+- Phrases like "look here", "I love you", "the cat is sleeping" generated correctly
+
+**What this proves:** Fourier mixing scales to longer sequences (up to 30 phonemes), acoustic validation catches quality issues that token accuracy misses, and the architecture handles multi-word generation without modification.
 
 ### Architecture: Living Resonance Networks
 
@@ -85,9 +92,9 @@ FFTNet (2025) and FNet (Google, 2021) proved pure FFT can replace attention. We'
 ## What's Next
 
 ### Immediate Goals
-- Expand to multi-word utterances and sentences
 - Add visual grounding: show object → say word → learn association
 - Cross-modal fusion: correlate sounds with visual patterns
+- Sentence-level prosody (intonation, rhythm)
 
 ### Medium-term Vision
 - Full sensorimotor loop in 2D simulation
@@ -152,16 +159,17 @@ pytest tests/ -v
 
 **Speech perception:** 99.4% accuracy (40 phonemes)
 **Speech production:** 100% accuracy (individual phonemes)
-**Sequence generation:** 96% accuracy (word-level)
-**Self-listening:** Agent adjusts production based on self-heard output
-**Progressive curriculum:** Prevents catastrophic forgetting
+**Sequence generation:** 98% accuracy (words + phrases)
+**Multi-word phrases:** "look here" → ['L', 'UH', 'K', 'HH', 'IH', 'R'] ✓
+**Self-listening validation:** 0.95 acoustic similarity on correct productions
+**Progressive curriculum:** Dual-gated (token accuracy + acoustic match)
 **Online learning:** Stable with single-sample updates
 
 ## The Experiment
 
 This is fundamentally an exploration: **How far can we push Fourier-based architectures with embodied, sensory learning?**
 
-We don't know the limits yet. The speech results (96% accuracy, proper sequence termination, self-listening working) suggest there's something here worth pursuing.
+We don't know the limits yet. The speech results—98% accuracy on multi-word phrases, acoustic validation confirming productions sound correct, proper sequence termination—suggest there's something here worth pursuing.
 
 The components are individually proven. The combination is novel. The compute requirements are manageable (runs on laptop CPU).
 

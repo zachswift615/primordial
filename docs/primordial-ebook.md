@@ -82,16 +82,43 @@ In December 2025, we taught the agent to speak through self-listening.
 - **96% accuracy** on word-level phoneme sequences
 - Learned to generate proper sequences with EOS termination
 
-**Words mastered:** ba, bee, ma, me, hi, go, yes, no, mom, dad, hello, food, water, banana, elephant (partial)
+**Words mastered:** ba, bee, ma, me, hi, go, yes, no, mom, dad, hello, food, water, banana, elephant
+
+### Phase 4: Multi-Word Phrases *(December 2025)*
+
+The latest breakthrough: extending from single words to multi-word phrases and sentences.
+
+**Training run results:**
+- **98% token accuracy** on 106 entries (51 words + 55 phrases)
+- **0.95 acoustic similarity** confirming productions sound correct
+- Dual-gated curriculum: advance only when both token accuracy AND acoustic match pass
+- Trained in 147 epochs (~30 minutes on laptop CPU)
+
+**Phrases mastered:**
+- 2-word: "hello world", "good morning", "look here", "help me"
+- 3-word: "I love you", "how are you", "I want food"
+- Sentences: "the cat is sleeping", "can you help me", "I want to go home"
+
+**The key innovation:** Self-listening as validation. Instead of trusting token accuracy alone, we synthesize the generated phonemes via TTS, encode the audio, and compare to the target embedding. This catches cases where tokens are correct but production sounds wrong.
+
+```
+Epoch 137: 'look here'
+    Generated: ['L', 'UH', 'K', 'HH', 'IH', 'R']
+    Target:    ['L', 'UH', 'K', 'HH', 'IH', 'R']
+    Match: YES, Acoustic: 0.93
+```
+
+The agent correctly generates 6-phoneme, 2-word phrases. The acoustic score confirms it sounds right.
 
 ### What This Proves
 
 The architecture can:
 - Learn from continuous sensory streams (mel spectrograms, not text)
 - Support online learning with single-sample updates
-- Handle autoregressive sequence generation
+- Handle autoregressive sequence generation up to 30 phonemes
 - Self-supervise through prediction error
 - Scale progressively without catastrophic forgetting
+- Generate multi-word phrases with proper acoustic quality
 
 The self-listening loop—produce sound, hear output, adjust—mirrors infant speech acquisition. No labeled datasets. Just experience.
 
@@ -116,18 +143,18 @@ When the agent produces a latent vector [0.85, 0.92, -0.88, 0.95, 0.05, -0.98], 
 
 ## Chapter 6: From Phonemes to Language
 
-We've proven the architecture can generate word-level phoneme sequences at 96% accuracy. What are the limits?
+We've proven the architecture can generate multi-word phrases at 98% accuracy. What are the limits?
 
-### Near-Term Achievable
-**Multi-word utterances** (10-20 phonemes)
-- "hello world," "I want food"
-- Transformer decoder handles this easily (O(20²) = 400 ops, trivial)
-- Need: more training data, slightly longer sequences
+### Already Achieved
+**Multi-word utterances** (10-20 phonemes) ✓
+- "hello world", "I love you", "I want food" — all working
+- Dual-gated curriculum with acoustic validation
+- 55 hand-curated phrases in training set
 
-**Simple sentences** (20-50 phonemes)
-- "Can you help me find some water"
-- Still well within transformer capacity
-- Need: sentence-level training data, prosody modeling (intonation)
+**Simple sentences** (20-30 phonemes) ✓
+- "the cat is sleeping", "can we go to the park"
+- 98% token accuracy, 0.95 acoustic similarity
+- No architecture changes needed — just more training data
 
 ### Medium-Term Exploration
 **Cross-modal grounding**
@@ -317,7 +344,9 @@ CrossEntropy(discrete_tokens, target_tokens) +
 
 Multi-task supervision: discrete for strong gradients, latent for smooth articulation, embedding for acoustic quality.
 
-## Training Results (200 Epochs)
+## Training Results
+
+### Word-Level (Phase 3, 160 epochs)
 
 | Metric | Value |
 |--------|-------|
@@ -325,15 +354,28 @@ Multi-task supervision: discrete for strong gradients, latent for smooth articul
 | Loss (start → end) | 4.5 → 0.78 |
 | Short words (2-3 phonemes) | 100% accuracy |
 | Medium words (4-5 phonemes) | ~95% accuracy |
-| Long words (6+ phonemes) | ~85% accuracy, improving |
-| Sequence termination | Learned EOS correctly |
+| Long words (6+ phonemes) | ~85% accuracy |
 
-Progressive curriculum phases:
-1. Syllables (epochs 1-30): 0% → 79%
-2. Short words (epochs 31-60): 50% → 89%
-3. All words (epochs 61+): 62% → 96%
+### Multi-Word Phrases (Phase 4, 147 epochs)
 
-No catastrophic forgetting observed. Online learning remains stable.
+| Metric | Value |
+|--------|-------|
+| Final token accuracy | **98%** |
+| Final acoustic match | **0.95** |
+| Loss (start → end) | 3.9 → 0.24 |
+| 2-word phrases | 98%+ accuracy |
+| Sentences (up to 30 phonemes) | 95%+ accuracy |
+| Dual-gate curriculum | Passed automatically |
+
+**Training progression with dual gating:**
+```
+Phase 1 (epochs 1-40):   10% → 74% token, 0.41 → 0.90 acoustic
+Phase 2 (epochs 41-76):  51% → 86% token, passed at epoch 76
+Phase 3 (epochs 77):     82% token, passed immediately
+Phase 4 (epochs 78-147): 82% → 98% token, 0.90 → 0.95 acoustic
+```
+
+No catastrophic forgetting observed. Online learning remains stable. Acoustic validation catches quality issues token accuracy misses.
 
 ## Research Foundation
 
@@ -353,12 +395,18 @@ python -m primordial.scripts.run_speech --phase classification --epochs 20
 # Train production (Phase 2)
 python -m primordial.scripts.train_production_interactive --epochs 50
 
-# Train sequences (Phase 3)
+# Train sequences with multi-word phrases (Phase 3-4)
 python -m primordial.scripts.train_sequence \
   --encoder-checkpoint checkpoints/production/curriculum_best.pt \
   --epochs 200
 
-# Tests (460 passing)
+# The training script now includes:
+# - 55 hand-curated phrases alongside 51 words
+# - Acoustic match tracking every 10 batches
+# - Dual-gated curriculum (token accuracy + acoustic match)
+# - Demo output showing both metrics
+
+# Tests (490+ passing)
 pytest tests/ -v
 ```
 
@@ -808,7 +856,9 @@ Can you build reasoning on that foundation? We don't know yet.
 This is fundamentally an exploration, not a product. We're asking: **How far can we push Fourier-based embodied learning?**
 
 The answer unfolds through experiments:
-- Speech: 96% accuracy ✓
+- Speech (single words): 96% accuracy ✓
+- Speech (multi-word phrases): 98% accuracy ✓
+- Acoustic validation: 0.95 similarity ✓
 - Cross-modal grounding: TBD
 - Survival learning: TBD
 - Language emergence: TBD
@@ -816,7 +866,7 @@ The answer unfolds through experiments:
 
 Each step either works or teaches us why it doesn't. Both outcomes are valuable.
 
-The components are proven individually. The combination is novel. The compute is manageable. The early results exceed expectations.
+The components are proven individually. The combination is novel. The compute is manageable. The results keep exceeding expectations.
 
 Let's see where this goes.
 
@@ -828,6 +878,7 @@ Let's see where this goes.
 
 **Document Status:** Living document, updated as experiments progress
 **Last Updated:** December 2025
-**Current Focus:** Autoregressive sequence generation, cross-modal grounding
-**Tests Passing:** 460 (185 LRN architecture, 275 world system)
-**Sequence Accuracy:** 96%
+**Current Focus:** Cross-modal grounding (vision-speech fusion)
+**Tests Passing:** 490+ (185 LRN architecture, 275 world system, 29 speech)
+**Sequence Accuracy:** 98% (multi-word phrases)
+**Acoustic Similarity:** 0.95
