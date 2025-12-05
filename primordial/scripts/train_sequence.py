@@ -71,31 +71,44 @@ def parse_args():
     return parser.parse_args()
 
 
-# Curriculum phases (total: 30 + 30 + 40 + 60 = 160 epochs)
+# Curriculum phases with dual gating (token accuracy + acoustic match)
+# Total: 40 + 40 + 50 + 70 = 200 epochs
 CURRICULUM = {
     1: {
-        'max_phonemes': 3,
-        'epochs': 30,
-        'self_listen_ratio': 0.1,
+        'max_phonemes': 8,
+        'epochs': 40,
+        'include_phrases': True,
+        'token_threshold': 0.85,
+        'acoustic_threshold': 0.80,
         'temperature': 0.0,
+        'description': 'Single words + 2-word phrases',
     },
     2: {
-        'max_phonemes': 5,
-        'epochs': 30,
-        'self_listen_ratio': 0.2,
+        'max_phonemes': 15,
+        'epochs': 40,
+        'include_phrases': True,
+        'token_threshold': 0.85,
+        'acoustic_threshold': 0.80,
         'temperature': 0.5,
+        'description': '+ 3-word phrases',
     },
     3: {
-        'max_phonemes': 7,
-        'epochs': 40,
-        'self_listen_ratio': 0.2,
+        'max_phonemes': 22,
+        'epochs': 50,
+        'include_phrases': True,
+        'token_threshold': 0.80,
+        'acoustic_threshold': 0.75,
         'temperature': 0.5,
+        'description': '+ short sentences',
     },
     4: {
-        'max_phonemes': 12,
-        'epochs': 60,
-        'self_listen_ratio': 0.3,
+        'max_phonemes': 30,
+        'epochs': 70,
+        'include_phrases': True,
+        'token_threshold': 0.0,  # No gate
+        'acoustic_threshold': 0.0,  # No gate
         'temperature': 0.7,
+        'description': 'All data',
     },
 }
 
