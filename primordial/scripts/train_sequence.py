@@ -314,31 +314,46 @@ def main():
             if (epoch + 1) % args.demo_every == 0:
                 model.eval()
                 with torch.no_grad():
-                    # Pick a word from dataset
-                    mel, _, _, word = dataset[epoch % len(dataset)]
+                    # Pick a word/phrase from dataset
+                    sample_idx = epoch % len(dataset)
+                    mel, _, _, word = dataset[sample_idx]
                     mel = mel.unsqueeze(0)
 
                     # Generate
-                    phonemes, latents = model.generate(mel, temperature=phase['temperature'])
+                    phonemes, latents = model.generate(
+                        mel,
+                        temperature=phase['temperature'],
+                        min_length=2,
+                    )
 
-                    target_phonemes = WORD_PHONEMES[word]
+                    # Get target phonemes
+                    all_entries = get_all_entries(include_phrases=True)
+                    target_phonemes = all_entries.get(word, [])
 
                     match = phonemes == target_phonemes
-                    print(f"  Demo: '{word}' -> {phonemes} "
-                          f"(target: {target_phonemes}) "
-                          f"[{'MATCH' if match else 'miss'}]")
+
+                    # Compute acoustic match for demo
+                    target_audio = tts.synthesize_phonemes(target_phonemes)
+                    demo_acoustic = compute_acoustic_match(
+                        model, tts, config, phonemes, target_audio
+                    ) if phonemes else 0.0
+
+                    print(f"  Demo: '{word}'")
+                    print(f"    Generated: {phonemes}")
+                    print(f"    Target:    {target_phonemes}")
+                    print(f"    Match: {'YES' if match else 'NO'}, "
+                          f"Acoustic: {demo_acoustic:.2f}")
 
                     if play_audio and phonemes:
                         # Play target
-                        target_audio = tts.synthesize_phonemes(target_phonemes)
-                        print(f"    Target: ", end="", flush=True)
+                        print(f"    Playing target...", end=" ", flush=True)
                         sd.play(target_audio, tts.sample_rate)
                         sd.wait()
                         print("done")
 
                         # Play produced
                         produced_audio = tts.synthesize_phonemes(phonemes)
-                        print(f"    Produced: ", end="", flush=True)
+                        print(f"    Playing produced...", end=" ", flush=True)
                         sd.play(produced_audio, tts.sample_rate)
                         sd.wait()
                         print("done")
