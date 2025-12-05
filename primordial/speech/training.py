@@ -796,6 +796,117 @@ class SequenceMetrics:
     step: int
 
 
+def compute_acoustic_match(
+    model,  # SpeechSequenceLRN or SpeechLRN with encoder
+    tts,  # TTSBackend
+    config: SpeechConfig,
+    generated_phonemes: list,
+    target_audio: np.ndarray,
+) -> float:
+    """Compute acoustic similarity between generated and target audio.
+
+    Returns cosine similarity (0-1) for logging and curriculum gating.
+    No gradients - purely diagnostic.
+
+    Args:
+        model: Model with encoder attribute
+        tts: TTS backend for synthesis
+        config: Speech configuration
+        generated_phonemes: List of phoneme strings from generation
+        target_audio: Target audio waveform (numpy array)
+
+    Returns:
+        Similarity score 0.0-1.0 (1.0 = perfect match)
+    """
+    import numpy as np
+    import torch
+    import torch.nn.functional as F
+    from .encoders import compute_mel_spectrogram
+
+    # Handle empty phonemes
+    if not generated_phonemes:
+        return 0.0
+
+    # Synthesize generated sequence
+    produced_audio = tts.synthesize_phonemes(generated_phonemes)
+
+    # Convert to tensors
+    produced_waveform = torch.from_numpy(produced_audio).float()
+    target_waveform = torch.from_numpy(target_audio).float()
+
+    # Resample if needed
+    if tts.sample_rate != config.sample_rate:
+        produced_len = int(len(produced_waveform) * config.sample_rate / tts.sample_rate)
+        produced_waveform = F.interpolate(
+            produced_waveform.view(1, 1, -1),
+            size=produced_len,
+            mode='linear',
+            align_corners=False
+        ).squeeze()
+
+        target_len = int(len(target_waveform) * config.sample_rate / tts.sample_rate)
+        target_waveform = F.interpolate(
+            target_waveform.view(1, 1, -1),
+            size=target_len,
+            mode='linear',
+            align_corners=False
+        ).squeeze()
+
+    # Compute mel spectrograms
+    produced_mel = compute_mel_spectrogram(
+        produced_waveform,
+        sample_rate=config.sample_rate,
+        n_mels=config.n_mels,
+        n_fft=config.n_fft,
+        hop_length=config.hop_length,
+    ).squeeze(0)
+
+    target_mel = compute_mel_spectrogram(
+        target_waveform,
+        sample_rate=config.sample_rate,
+        n_mels=config.n_mels,
+        n_fft=config.n_fft,
+        hop_length=config.hop_length,
+    ).squeeze(0)
+
+    # Pad/truncate to standard size
+    def normalize_mel(mel, n_frames):
+        if mel.shape[1] < n_frames:
+            mel = F.pad(mel, (0, n_frames - mel.shape[1]))
+        else:
+            mel = mel[:, :n_frames]
+        return mel
+
+    produced_mel = normalize_mel(produced_mel, config.n_frames)
+    target_mel = normalize_mel(target_mel, config.n_frames)
+
+    # Encode through model (no gradients)
+    with torch.no_grad():
+        # Get encoder - handle both SpeechSequenceLRN and SpeechLRN
+        encoder = getattr(model, 'encoder', model)
+
+        # Add batch dimension
+        produced_mel = produced_mel.unsqueeze(0)
+        target_mel = target_mel.unsqueeze(0)
+
+        # Forward through encoder's encode method to get pooled features
+        produced_features = encoder.encode(produced_mel)
+        target_features = encoder.encode(target_mel)
+
+        # Features are already pooled, just flatten
+        produced_features = produced_features.flatten()
+        target_features = target_features.flatten()
+
+        # Cosine similarity
+        similarity = F.cosine_similarity(
+            produced_features.unsqueeze(0),
+            target_features.unsqueeze(0)
+        ).item()
+
+        # Clamp to 0-1 range (cosine can be negative)
+        return max(0.0, similarity)
+
+
 class SequenceTrainer:
     """Trainer for autoregressive phoneme sequence generation.
 
