@@ -14,34 +14,50 @@ The goal: See how far we can push embodied learning on consumer hardware.
 
 ## Current Progress
 
-### Speech Learning (Complete)
+### Speech Learning (Active Development)
 
-The agent learned to speak through self-listening:
+#### Previous Work (Piper-based)
+- 99.4% phoneme perception accuracy
+- 98% accuracy on multi-word phrases with synthetic TTS
+- Self-listening validation with acoustic similarity scoring
 
-**Perception (Phase 1)**
-- 99.4% phoneme classification accuracy
-- CNN encoder → Fourier mixing → phoneme recognition
-- 40 phonemes mastered
+#### Current Direction: SPARC Integration (December 2025)
 
-**Production (Phase 2)**
-- 100% accuracy producing individual phonemes
-- 6D articulatory latent space (front-back, high-low, rounded, voiced, manner, vowel/consonant)
-- Self-listening loop: produce → synthesize via TTS → hear → adjust
+We're migrating from Piper TTS to **Berkeley's SPARC** (Speech Articulatory Coding) for interpretable, differentiable speech production.
 
-**Autoregressive Sequences (Phase 3)**
-- 96% accuracy on word-level phoneme sequences
-- 3-layer transformer decoder with dual heads (discrete tokens + continuous latents)
-- Progressive curriculum: syllables → short words → long words
-- Proper sequence termination with EOS tokens
+**Why SPARC?**
+- **Interpretable control**: 12D articulatory features (tongue, lips, jaw positions) vs opaque phoneme tokens
+- **Differentiable**: Can train end-to-end with audio reconstruction loss
+- **Embodied**: Mirrors actual vocal tract kinematics from EMA data
 
-**Multi-Word Phrases (Phase 4)** *(New!)*
-- **98% accuracy** on multi-word phrases and sentences
-- 106 entries: single words + 55 hand-curated phrases
-- Dual-gated curriculum: token accuracy AND acoustic similarity must pass
-- Self-listening validation confirms productions actually sound correct
-- Phrases like "look here", "I love you", "the cat is sleeping" generated correctly
+**The Architecture:**
+```
+┌─────────────────────────────────────────────────────┐
+│  PRIMORDIAL (Brain)         SPARC (Mouth)           │
+│                                                     │
+│  Intent/Target ──> Articulatory ──> SPARC ──> Audio │
+│                    Head (14D)       Decoder         │
+│                                                     │
+│  Learns HOW to     EMA (12D)        Executes the    │
+│  move articulators + Pitch (1D)     movements,      │
+│                    + Loudness (1D)  makes sound     │
+└─────────────────────────────────────────────────────┘
+```
 
-**What this proves:** Fourier mixing scales to longer sequences (up to 30 phonemes), acoustic validation catches quality issues that token accuracy misses, and the architecture handles multi-word generation without modification.
+**Primordial = Brain** (decides articulator movements)
+**SPARC = Mouth** (converts movements to sound)
+
+See `primordial/speech/ARCHITECTURE.md` for full details.
+
+**Training Pipeline:**
+1. **Supervised**: Predict SPARC articulatory features from mel spectrograms
+2. **Self-listening**: Generate audio, compare to target (differentiable)
+3. **RL (future)**: Babbling curriculum, learn from reward
+
+**What this enables:**
+- Model learns to control a virtual vocal tract
+- Natural prosody emerges from learning pitch/loudness patterns
+- Foundation for true embodied speech learning (like a baby babbling)
 
 ### Architecture: Living Resonance Networks
 
@@ -64,8 +80,8 @@ Predict Predict Head  Decoder
 **Key innovations:**
 - **Spectral filtering** instead of attention: patterns resonate/interfere in frequency space
 - **Multi-task prediction**: world dynamics + survival value learned simultaneously
-- **Articulatory latent space**: phonemes positioned by physical production features
-- **Self-listening training**: agent hears its own outputs and adjusts
+- **SPARC integration**: interpretable articulatory control (tongue, lips, jaw)
+- **Self-listening training**: agent hears its own outputs and adjusts (differentiable with SPARC)
 
 ## Parameter Efficiency
 
@@ -122,16 +138,20 @@ The novel combination: Fourier + continuous input + online learning + embodied s
 
 ```
 primordial/
-├── speech/           # Phoneme perception, production, sequence generation
-│   ├── encoders.py   # CNN, Fourier mixing
-│   ├── heads.py      # Perception, production heads
-│   ├── latent.py     # 6D articulatory space
-│   ├── sequence_decoder.py  # Transformer decoder
-│   └── training.py   # Self-listening loop
-├── lrn/              # Core architecture (Fourier mixing, encoders, heads)
-├── world/            # 2D simulation (planned)
-├── agent/            # Embodied agent (planned)
-└── tests/            # 460 tests passing
+├── speech/               # Speech perception and production
+│   ├── ARCHITECTURE.md   # Brain vs Mouth architecture docs
+│   ├── encoders.py       # CNN encoder, mel spectrogram (with CMVN)
+│   ├── sparc_integration.py  # SPARC wrapper, ArticulatoryHead (planned)
+│   ├── sequence_decoder.py   # Transformer decoder
+│   ├── training.py       # Training loops
+│   └── config.py         # Speech configuration
+├── docs/
+│   ├── sparc_integration_plan.md  # Full training pipeline plan
+│   └── primordial-ebook.md        # Project history and vision
+├── lrn/                  # Core architecture (Fourier mixing)
+├── world/                # 2D survival simulation
+├── agent/                # Embodied agent
+└── your_voice_embedding.npy  # Model's voice identity (64D SPARC embedding)
 ```
 
 ## Running the Code

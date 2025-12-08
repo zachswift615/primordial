@@ -137,6 +137,78 @@ When the agent produces a latent vector [0.85, 0.92, -0.88, 0.95, 0.05, -0.98], 
 
 **Why this matters:** Instead of learning arbitrary token embeddings, the model learns in a space that mirrors how humans actually produce speech. Similar sounds are geometrically close. Phonetic features are disentangled dimensions.
 
+## Chapter 5.5: The SPARC Pivot (December 2025)
+
+After achieving 98% accuracy on multi-word phrases, we hit a wall: the Piper TTS backend had fundamental limitations.
+
+### The Problems with Piper
+
+1. **Not differentiable**: Couldn't backpropagate through audio synthesis
+2. **Artifacts**: 88 click/pop artifacts per 0.5s sample vs 1 for real speech
+3. **Volume mismatch**: Piper audio was 14x louder than LibriSpeech
+4. **Opaque representation**: 8D phoneme tokens don't map to physical articulation
+
+### Enter SPARC
+
+Berkeley's **Speech Articulatory Coding** (SPARC) offers exactly what we needed:
+
+**12D EMA features** representing actual articulator positions:
+- Tongue Dorsum (TDX, TDY) - back of tongue
+- Tongue Body (TBX, TBY) - middle of tongue
+- Tongue Tip (TTX, TTY) - front of tongue
+- Lower Incisor (LIX, LIY) - jaw
+- Upper Lip (ULX, ULY)
+- Lower Lip (LLX, LLY)
+
+Plus **pitch** and **loudness** for prosody, and a **64D speaker embedding** for voice identity.
+
+### The Key Insight: Brain vs Mouth
+
+SPARC is an analysis-synthesis system—it can encode speech to articulatory features and decode back to audio. But it can't *generate* novel speech. It needs input.
+
+That's where Primordial comes in:
+
+```
+SPARC alone:
+    Audio (must exist) → Encoder → Articulation → Decoder → Audio
+    Problem: Can't generate novel speech
+
+Primordial + SPARC:
+    Intent → Primordial → Articulation → SPARC Decoder → Audio
+    Solution: Primordial decides, SPARC executes
+```
+
+**Primordial is the brain.** It decides how to move the articulators.
+**SPARC is the mouth.** It converts those movements to sound.
+
+This is like the relationship between motor cortex and vocal tract in humans. The brain plans the movements; the body executes them.
+
+### Why This Matters for Embodied Learning
+
+With SPARC, we can now:
+
+1. **Train end-to-end**: Gradients flow from audio loss through SPARC decoder to our model
+2. **Self-listen differentiably**: Model generates → SPARC synthesizes → compare to target → backprop
+3. **Interpret what the model learned**: Visualize predicted tongue/lip trajectories
+4. **Use any voice**: Speaker embedding is separate from articulation
+
+The self-listening loop becomes truly embodied:
+- Model attempts to say "hello"
+- SPARC decoder produces audio
+- Model "hears" its output (via mel spectrogram)
+- Compares to target
+- Adjusts articulation
+
+Like a baby babbling and learning from what it hears.
+
+### The New Training Pipeline
+
+1. **Phase 1 (Supervised)**: Pre-encode LibriSpeech with SPARC, train model to predict articulatory features
+2. **Phase 2 (Self-Listening)**: Generate audio through SPARC, compute audio-level loss, fine-tune
+3. **Phase 3 (RL)**: Babbling curriculum—phonemes → syllables → words → sentences
+
+See `docs/sparc_integration_plan.md` for full details.
+
 ---
 
 # Part Three: How Far Can This Go?
@@ -878,7 +950,6 @@ Let's see where this goes.
 
 **Document Status:** Living document, updated as experiments progress
 **Last Updated:** December 2025
-**Current Focus:** Cross-modal grounding (vision-speech fusion)
-**Tests Passing:** 490+ (185 LRN architecture, 275 world system, 29 speech)
-**Sequence Accuracy:** 98% (multi-word phrases)
-**Acoustic Similarity:** 0.95
+**Current Focus:** SPARC integration for embodied speech learning
+**Architecture:** Primordial (brain) + SPARC (mouth) - see Chapter 5.5
+**Next Steps:** Supervised articulatory prediction → Self-listening → RL babbling
