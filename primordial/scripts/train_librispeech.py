@@ -223,7 +223,9 @@ def main():
         logger.warning("  Training from scratch (not recommended)")
 
     # Trainer with lower LR for fine-tuning
-    trainer = SequenceTrainer(model, config, lr=args.lr)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    logger.info(f"Using device: {device}")
+    trainer = SequenceTrainer(model, config, lr=args.lr, device=device)
 
     # TTS for demos
     tts = create_tts_backend(config) if piper_voice else None
@@ -337,7 +339,7 @@ def main():
             with torch.no_grad():
                 for mels, input_tokens, target_tokens, identifiers in val_loader:
                     # Generate for first sample in batch
-                    generated, _ = model.generate(mels[0:1])
+                    generated, _ = model.generate(mels[0:1].to(device))
 
                     # Get target phonemes (convert indices to phonemes)
                     target_indices = target_tokens[0].tolist()
@@ -375,7 +377,7 @@ def main():
                     mel, input_tokens, target_tokens, speaker_id = librispeech_dataset[idx]
 
                     # Generate
-                    generated, _ = model.generate(mel.unsqueeze(0))
+                    generated, _ = model.generate(mel.unsqueeze(0).to(device))
 
                     # Get target phonemes
                     target_indices = target_tokens.tolist()
@@ -407,7 +409,7 @@ def main():
             print()
 
         # Save periodic checkpoint
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % 3 == 0:
             trainer.save_checkpoint(str(output_dir / f"librispeech_epoch{epoch+1}.pt"))
 
     # Final results

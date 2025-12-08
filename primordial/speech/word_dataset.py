@@ -1,6 +1,7 @@
 """Word dataset for sequence training."""
 import torch
 import torch.nn.functional as F
+import torchaudio
 from torch.utils.data import Dataset
 from typing import List, Optional, Tuple
 
@@ -214,15 +215,14 @@ class WordDataset(Dataset):
             audio = self.tts.synthesize_phonemes(phonemes)
             waveform = torch.from_numpy(audio).float()
 
-            # Resample if needed
+            # Resample if needed (use proper sinc filtering, not linear interpolation)
             if self.tts.sample_rate != self.config.sample_rate:
-                target_len = int(len(waveform) * self.config.sample_rate / self.tts.sample_rate)
-                waveform = F.interpolate(
-                    waveform.view(1, 1, -1),
-                    size=target_len,
-                    mode='linear',
-                    align_corners=False
-                ).squeeze()
+                resampler = torchaudio.transforms.Resample(
+                    orig_freq=self.tts.sample_rate,
+                    new_freq=self.config.sample_rate,
+                    resampling_method='sinc_interp_hann',  # High quality sinc interpolation
+                )
+                waveform = resampler(waveform.unsqueeze(0)).squeeze(0)
 
             # Compute mel spectrogram
             mel = compute_mel_spectrogram(

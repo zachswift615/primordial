@@ -8,6 +8,7 @@ Applies random transformations to audio to improve speaker invariance:
 """
 
 import torch
+import torchaudio
 import random
 from typing import Optional
 
@@ -52,7 +53,7 @@ def augment_waveform(
 
     # Time stretch
     if random.random() < time_stretch_prob:
-        waveform = _time_stretch(waveform, stretch_range)
+        waveform = _time_stretch(waveform, stretch_range, sample_rate)
 
     # Add noise
     if random.random() < noise_prob:
@@ -75,8 +76,7 @@ def _pitch_shift(
 ) -> torch.Tensor:
     """Apply pitch shift to waveform.
 
-    Uses simple resampling-based pitch shifting (changes duration slightly).
-    For production, consider using phase vocoder or WSOLA.
+    Uses resampling-based pitch shifting with proper sinc interpolation.
     """
     shift_semitones = random.uniform(*pitch_range)
 
@@ -84,28 +84,41 @@ def _pitch_shift(
     # Positive shift = faster playback = higher pitch
     rate = 2 ** (shift_semitones / 12)
 
-    # Resample to shift pitch
-    orig_len = waveform.shape[-1]
-    new_len = int(orig_len / rate)
-
-    if new_len <= 0:
+    if rate == 1.0:
         return waveform
 
-    # Simple linear interpolation
-    waveform = torch.nn.functional.interpolate(
-        waveform.unsqueeze(0),
-        size=new_len,
-        mode='linear',
-        align_corners=False,
-    ).squeeze(0)
+    orig_len = waveform.shape[-1]
 
-    # Resample back to original length to maintain duration
-    waveform = torch.nn.functional.interpolate(
-        waveform.unsqueeze(0),
-        size=orig_len,
-        mode='linear',
-        align_corners=False,
-    ).squeeze(0)
+    # Use torchaudio for high-quality resampling
+    # First resample to shift pitch (this changes duration)
+    intermediate_rate = int(sample_rate * rate)
+    if intermediate_rate <= 0:
+        return waveform
+
+    # Resample down to shift pitch up (or vice versa)
+    resampler1 = torchaudio.transforms.Resample(
+        orig_freq=sample_rate,
+        new_freq=intermediate_rate,
+        resampling_method='sinc_interp_hann',
+    )
+
+    # Resample back to original sample rate (restores duration approximately)
+    resampler2 = torchaudio.transforms.Resample(
+        orig_freq=intermediate_rate,
+        new_freq=sample_rate,
+        resampling_method='sinc_interp_hann',
+    )
+
+    # Apply pitch shift
+    waveform = resampler1(waveform)
+    waveform = resampler2(waveform)
+
+    # Pad or truncate to original length
+    current_len = waveform.shape[-1]
+    if current_len < orig_len:
+        waveform = torch.nn.functional.pad(waveform, (0, orig_len - current_len))
+    elif current_len > orig_len:
+        waveform = waveform[..., :orig_len]
 
     return waveform
 
@@ -113,34 +126,39 @@ def _pitch_shift(
 def _time_stretch(
     waveform: torch.Tensor,
     stretch_range: tuple,
+    sample_rate: int = 16000,
 ) -> torch.Tensor:
     """Apply time stretch to waveform.
 
-    Changes tempo without changing pitch (approximately).
-    Uses simple resampling - for production consider phase vocoder.
+    Note: This changes both tempo AND pitch slightly. For true time-stretch
+    without pitch change, a phase vocoder would be needed.
+    Uses proper sinc interpolation for better quality.
     """
     rate = random.uniform(*stretch_range)
-    orig_len = waveform.shape[-1]
-    new_len = int(orig_len * rate)
 
-    if new_len <= 0:
+    if rate == 1.0:
         return waveform
 
-    # Stretch/compress
-    waveform = torch.nn.functional.interpolate(
-        waveform.unsqueeze(0),
-        size=new_len,
-        mode='linear',
-        align_corners=False,
-    ).squeeze(0)
+    orig_len = waveform.shape[-1]
+
+    # Use resampling to stretch/compress
+    # This is equivalent to playing back at a different speed
+    stretched_rate = int(sample_rate / rate)
+    if stretched_rate <= 0:
+        return waveform
+
+    resampler = torchaudio.transforms.Resample(
+        orig_freq=sample_rate,
+        new_freq=stretched_rate,
+        resampling_method='sinc_interp_hann',
+    )
+    waveform = resampler(waveform)
 
     # Pad or truncate to original length
-    if new_len < orig_len:
-        # Pad with zeros
-        pad_size = orig_len - new_len
-        waveform = torch.nn.functional.pad(waveform, (0, pad_size))
-    elif new_len > orig_len:
-        # Truncate
+    current_len = waveform.shape[-1]
+    if current_len < orig_len:
+        waveform = torch.nn.functional.pad(waveform, (0, orig_len - current_len))
+    elif current_len > orig_len:
         waveform = waveform[..., :orig_len]
 
     return waveform

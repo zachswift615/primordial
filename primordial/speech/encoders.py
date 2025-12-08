@@ -177,6 +177,8 @@ def compute_mel_spectrogram(
     n_mels: int = 80,
     n_fft: int = 400,
     hop_length: int = 160,
+    normalize_audio: bool = True,
+    apply_cmvn: bool = True,
 ) -> torch.Tensor:
     """Compute mel spectrogram from waveform.
 
@@ -186,6 +188,10 @@ def compute_mel_spectrogram(
         n_mels: Number of mel bins
         n_fft: FFT window size
         hop_length: Hop between frames
+        normalize_audio: If True, normalize waveform to unit variance before processing.
+            This helps bridge the gap between loud synthetic and quiet real audio.
+        apply_cmvn: If True, apply cepstral mean and variance normalization to the
+            output mel spectrogram. This normalizes out recording quality differences.
 
     Returns:
         (batch, n_mels, n_frames) mel spectrogram in log scale
@@ -195,6 +201,13 @@ def compute_mel_spectrogram(
         waveform = waveform.unsqueeze(0)
 
     batch_size, num_samples = waveform.shape
+
+    # Normalize audio to zero mean and unit variance
+    # This bridges the gap between loud Piper audio and quiet LibriSpeech
+    if normalize_audio:
+        waveform = waveform - waveform.mean(dim=-1, keepdim=True)
+        std = waveform.std(dim=-1, keepdim=True)
+        waveform = waveform / (std + 1e-8)
 
     # Compute STFT
     # Window
@@ -227,6 +240,13 @@ def compute_mel_spectrogram(
 
     # Log scale
     mel_spec = torch.log(mel_spec + 1e-9)
+
+    # Apply CMVN (Cepstral Mean and Variance Normalization)
+    # This normalizes out speaker/recording differences, forcing model to focus on phonetic content
+    if apply_cmvn:
+        mel_mean = mel_spec.mean(dim=-1, keepdim=True)
+        mel_std = mel_spec.std(dim=-1, keepdim=True)
+        mel_spec = (mel_spec - mel_mean) / (mel_std + 1e-8)
 
     return mel_spec
 
