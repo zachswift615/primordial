@@ -57,6 +57,30 @@ class SpeechConfig:
     babbling_decay: float = 0.02           # Reduce babbling by this per epoch
     min_babbling_ratio: float = 0.2        # Floor for babbling ratio
 
+    # SPARC integration
+    sparc_ema_dim: int = 12                # EMA articulator dimensions
+    sparc_frame_rate: int = 50             # SPARC output rate in Hz
+    sparc_speaker_dim: int = 64            # Speaker embedding dimension
+    sparc_model_path: str = ""             # Path to SPARC checkpoint
+    sparc_voice_embedding_path: str = ""   # Path to your_voice_embedding.npy
+
+    # SPARC loss weights
+    ema_loss_weight: float = 1.0           # Articulation accuracy (most important)
+    sparc_pitch_loss_weight: float = 0.5   # Prosody melody
+    sparc_loudness_loss_weight: float = 0.3  # Emphasis patterns
+    smoothness_loss_weight: float = 0.1    # Temporal smoothness regularization
+
+    @property
+    def sparc_n_frames(self) -> int:
+        """Number of SPARC frames per audio sample."""
+        return int(self.audio_duration * self.sparc_frame_rate)
+
+    @property
+    def mel_to_sparc_ratio(self) -> float:
+        """Ratio of mel frame rate to SPARC frame rate."""
+        mel_rate = self.sample_rate / self.hop_length  # 16000/160 = 100Hz
+        return mel_rate / self.sparc_frame_rate
+
     # Self-listening (agent hears its own output)
     enable_self_listening: bool = True
     self_listening_delay: float = 0.0  # Delay in seconds (0 = immediate)
