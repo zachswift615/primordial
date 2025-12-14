@@ -255,3 +255,136 @@ class AudioReconstructionHead(nn.Module):
         batch_size = x.shape[0]
         x = self.decoder(x)
         return x.view(batch_size, self.n_mels, self.n_frames)
+
+
+class ArticulatoryHead(nn.Module):
+    """Articulatory output head for SPARC control.
+
+    Takes pooled or sequence features and outputs:
+    - ema: (batch, n_frames, 12) - articulator positions (tongue, lips, jaw)
+    - pitch: (batch, n_frames, 1) - F0 in Hz
+    - loudness: (batch, n_frames, 1) - energy envelope
+
+    The temporal dimension is produced via a small decoder that upsamples
+    from the input to the target SPARC frame rate (50Hz).
+
+    Args:
+        config: SpeechConfig with SPARC settings
+        input_dim: Dimension of input features (384 for pooled, 128 for sequence)
+        from_sequence: If True, input is (batch, seq_len, hidden_dim) not pooled
+    """
+
+    def __init__(
+        self,
+        config: SpeechConfig,
+        input_dim: int = 384,
+        from_sequence: bool = False,
+    ):
+        super().__init__()
+        self.config = config
+        self.from_sequence = from_sequence
+        self.n_frames = config.sparc_n_frames
+
+        # Shared feature extraction
+        if from_sequence:
+            # Process sequence with 1D conv for temporal modeling
+            self.temporal = nn.Sequential(
+                nn.Conv1d(input_dim, 256, kernel_size=3, padding=1),
+                nn.GELU(),
+                nn.Conv1d(256, 256, kernel_size=3, padding=1),
+                nn.GELU(),
+            )
+            feature_dim = 256
+        else:
+            # Upsample from pooled to sequence
+            self.upsample = nn.Sequential(
+                nn.Linear(input_dim, 512),
+                nn.GELU(),
+                nn.Linear(512, self.n_frames * 64),
+            )
+            # Temporal refinement
+            self.temporal = nn.Sequential(
+                nn.Conv1d(64, 128, kernel_size=5, padding=2),
+                nn.GELU(),
+                nn.Conv1d(128, 256, kernel_size=5, padding=2),
+                nn.GELU(),
+            )
+            feature_dim = 256
+
+        # EMA head: 12 articulator positions, bounded by tanh
+        self.ema_head = nn.Sequential(
+            nn.Conv1d(feature_dim, 128, kernel_size=3, padding=1),
+            nn.GELU(),
+            nn.Conv1d(128, 12, kernel_size=1),
+            nn.Tanh(),  # Bound to [-1, 1]
+        )
+
+        # Pitch head: positive Hz via softplus
+        self.pitch_head = nn.Sequential(
+            nn.Conv1d(feature_dim, 64, kernel_size=3, padding=1),
+            nn.GELU(),
+            nn.Conv1d(64, 1, kernel_size=1),
+        )
+        self.pitch_offset = 100.0  # Minimum pitch in Hz
+        self.pitch_scale = 300.0   # Range above offset
+
+        # Loudness head: [0, 1] via sigmoid
+        self.loudness_head = nn.Sequential(
+            nn.Conv1d(feature_dim, 64, kernel_size=3, padding=1),
+            nn.GELU(),
+            nn.Conv1d(64, 1, kernel_size=1),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x: torch.Tensor) -> dict:
+        """
+        Args:
+            x: (batch, input_dim) pooled features OR
+               (batch, seq_len, hidden_dim) sequence features
+
+        Returns:
+            dict with:
+                ema: (batch, n_frames, 12) articulator positions
+                pitch: (batch, n_frames, 1) F0 in Hz
+                loudness: (batch, n_frames, 1) energy
+        """
+        if self.from_sequence:
+            # Input: (batch, seq_len, hidden_dim)
+            # Conv expects: (batch, channels, length)
+            x = x.transpose(1, 2)
+            features = self.temporal(x)
+            # Interpolate to target frame count
+            features = F.interpolate(
+                features,
+                size=self.n_frames,
+                mode='linear',
+                align_corners=False
+            )
+        else:
+            # Input: (batch, input_dim) pooled
+            batch_size = x.shape[0]
+            # Upsample to sequence
+            x = self.upsample(x)
+            x = x.view(batch_size, 64, self.n_frames)
+            features = self.temporal(x)
+
+        # features: (batch, 256, n_frames)
+
+        # EMA: articulator positions
+        ema = self.ema_head(features)  # (batch, 12, n_frames)
+        ema = ema.transpose(1, 2)  # (batch, n_frames, 12)
+
+        # Pitch: F0 in Hz
+        pitch = self.pitch_head(features)  # (batch, 1, n_frames)
+        pitch = F.softplus(pitch) * self.pitch_scale + self.pitch_offset
+        pitch = pitch.transpose(1, 2)  # (batch, n_frames, 1)
+
+        # Loudness: energy envelope
+        loudness = self.loudness_head(features)  # (batch, 1, n_frames)
+        loudness = loudness.transpose(1, 2)  # (batch, n_frames, 1)
+
+        return {
+            'ema': ema,
+            'pitch': pitch,
+            'loudness': loudness,
+        }
