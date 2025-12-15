@@ -10,9 +10,10 @@ from dataclasses import dataclass
 
 from .config import SpeechConfig
 from .encoders import MelSpectrogramEncoder, CNNMelEncoder, compute_mel_spectrogram
-from .heads import SpeechHead, AudioReconstructionHead, ProductionHead
+from .heads import SpeechHead, AudioReconstructionHead, ProductionHead, ArticulatoryHead
 from .phonemes import NUM_PHONEMES, phoneme_to_index
 from .tts import create_tts_backend, phoneme_indices_to_audio
+from .sparc_losses import sparc_combined_loss
 
 
 @dataclass
@@ -36,7 +37,7 @@ class SpeechLRN(nn.Module):
     - Optional AudioReconstructionHead for self-supervised learning
     """
 
-    def __init__(self, config: SpeechConfig):
+    def __init__(self, config: SpeechConfig, output_head: str = "speech"):
         super().__init__()
         self.config = config
 
@@ -72,6 +73,7 @@ class SpeechLRN(nn.Module):
         self.speech_head = SpeechHead(config, input_dim=pooled_dim)
         self.production_head = ProductionHead(config, input_dim=pooled_dim)
         self.audio_reconstruction_head = AudioReconstructionHead(config, input_dim=pooled_dim)
+        self.articulatory_head = ArticulatoryHead(config, input_dim=pooled_dim)
 
     def encode(self, mel_spectrogram: torch.Tensor) -> torch.Tensor:
         """Encode mel spectrogram to pooled features.
@@ -131,6 +133,36 @@ class SpeechLRN(nn.Module):
         pooled = self.encode(mel_spectrogram)
         return self.production_head(pooled)
 
+
+    @property
+    def lrn_layers(self):
+        """Alias for mixing_layers for compatibility."""
+        return self.mixing_layers
+
+    def forward_articulatory(self, mel: torch.Tensor) -> dict:
+        """Forward pass for articulatory output.
+
+        Args:
+            mel: (batch, n_mels, n_frames) mel spectrogram
+
+        Returns:
+            Dict with 'ema', 'pitch', 'loudness' predictions
+        """
+        # Encode and mix
+        encoded = self.audio_encoder(mel)
+        for layer in self.lrn_layers:
+            encoded = layer(encoded)
+        mixed = encoded
+
+        # Pool: (mean, max, last) concatenation
+        pooled = torch.cat([
+            mixed.mean(dim=1),
+            mixed.max(dim=1).values,
+            mixed[:, -1, :],
+        ], dim=-1)
+
+        # Articulatory head
+        return self.articulatory_head(pooled)
 
 class PhonemeDataset(Dataset):
     """Dataset of audio samples labeled with phonemes.
@@ -1055,3 +1087,150 @@ class SequenceTrainer:
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         self.step_count = checkpoint['step_count']
+
+
+class SPARCTrainer:
+    """Trainer for SPARC articulatory control.
+
+    Trains model to predict EMA/pitch/loudness from mel spectrograms.
+    Uses pre-computed SPARC targets for supervised learning.
+
+    Args:
+        model: SpeechLRN with articulatory head
+        config: SpeechConfig
+        lr: Learning rate
+        device: Torch device
+    """
+
+    def __init__(
+        self,
+        model: 'SpeechLRN',
+        config: SpeechConfig,
+        lr: float = 1e-4,
+        device: torch.device = None,
+    ):
+        self.model = model
+        self.config = config
+        self.device = device or torch.device('cpu')
+
+        self.model.to(self.device)
+        self.optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+
+        # Learning rate scheduler
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            self.optimizer, T_max=100, eta_min=lr * 0.1
+        )
+
+    def train_step(
+        self,
+        mel: torch.Tensor,
+        target: dict,
+    ) -> dict:
+        """Single training step.
+
+        Args:
+            mel: (batch, n_mels, mel_frames) input mel spectrogram
+            target: Dict with 'ema', 'pitch', 'loudness' targets
+
+        Returns:
+            Dict of loss values
+        """
+        self.model.train()
+
+        mel = mel.to(self.device)
+        target = {k: v.to(self.device) for k, v in target.items()}
+
+        # Forward pass
+        pred = self.model.forward_articulatory(mel)
+
+        # Compute losses
+        losses = sparc_combined_loss(pred, target, self.config)
+
+        # Backward pass
+        self.optimizer.zero_grad()
+        losses['total'].backward()
+
+        # Gradient clipping
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+
+        self.optimizer.step()
+
+        return {k: v.item() for k, v in losses.items()}
+
+    def validation_step(
+        self,
+        mel: torch.Tensor,
+        target: dict,
+    ) -> dict:
+        """Validation step (no gradient update).
+
+        Args:
+            mel: (batch, n_mels, mel_frames) input mel spectrogram
+            target: Dict with 'ema', 'pitch', 'loudness' targets
+
+        Returns:
+            Dict of loss values
+        """
+        self.model.eval()
+
+        mel = mel.to(self.device)
+        target = {k: v.to(self.device) for k, v in target.items()}
+
+        with torch.no_grad():
+            pred = self.model.forward_articulatory(mel)
+            losses = sparc_combined_loss(pred, target, self.config)
+
+        return {k: v.item() for k, v in losses.items()}
+
+    def train_epoch(
+        self,
+        dataloader: 'DataLoader',
+        epoch: int = 0,
+    ) -> dict:
+        """Train for one epoch.
+
+        Args:
+            dataloader: DataLoader yielding (mel, ema, pitch, loudness)
+            epoch: Current epoch number
+
+        Returns:
+            Dict of average losses
+        """
+        total_losses = {}
+        n_batches = 0
+
+        for mel, ema, pitch, loudness in dataloader:
+            target = {
+                'ema': ema,
+                'pitch': pitch,
+                'loudness': loudness,
+            }
+
+            losses = self.train_step(mel, target)
+
+            for k, v in losses.items():
+                total_losses[k] = total_losses.get(k, 0) + v
+            n_batches += 1
+
+        # Update scheduler
+        self.scheduler.step()
+
+        return {k: v / n_batches for k, v in total_losses.items()}
+
+    def save_checkpoint(self, path: str, epoch: int = 0) -> None:
+        """Save model checkpoint."""
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict(),
+            'config': self.config,
+        }, path)
+
+    def load_checkpoint(self, path: str) -> int:
+        """Load model checkpoint. Returns epoch number."""
+        checkpoint = torch.load(path, map_location=self.device)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        return checkpoint.get('epoch', 0)
