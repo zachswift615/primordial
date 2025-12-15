@@ -33,7 +33,7 @@ from .encoders import MelSpectrogramEncoder, CNNMelEncoder, compute_mel_spectrog
 from .heads import SpeechHead, SpeechSequenceHead, AudioReconstructionHead, ProductionHead, ArticulatoryHead
 from .sparc_integration import SPARCWrapper, VoiceIdentity
 from .tts import TTSBackend, PiperTTS, DummyTTS, create_tts_backend
-from .training import SpeechLRN, PhonemeTrainer, ProductionTrainer, PhonemeDataset, SyntheticPhonemeDataset, SequenceTrainer
+from .training import SpeechLRN, PhonemeTrainer, ProductionTrainer, PhonemeDataset, SyntheticPhonemeDataset, SequenceTrainer, SPARCTrainer
 from .sequence_decoder import SequenceDecoder, SpeechSequenceLRN, SinusoidalPositionalEncoding
 from .word_dataset import WordDataset, WORD_PHONEMES
 from .latent import (
@@ -89,6 +89,7 @@ __all__ = [
     'PhonemeDataset',
     'SyntheticPhonemeDataset',
     'SequenceTrainer',
+    'SPARCTrainer',
 
     # Latent space
     'PHONEME_ANCHORS',
