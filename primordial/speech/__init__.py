@@ -30,7 +30,8 @@ from .phonemes import (
     CONSONANTS,
 )
 from .encoders import MelSpectrogramEncoder, CNNMelEncoder, compute_mel_spectrogram
-from .heads import SpeechHead, SpeechSequenceHead, AudioReconstructionHead, ProductionHead
+from .heads import SpeechHead, SpeechSequenceHead, AudioReconstructionHead, ProductionHead, ArticulatoryHead
+from .sparc_integration import SPARCWrapper, VoiceIdentity
 from .tts import TTSBackend, PiperTTS, DummyTTS, create_tts_backend
 from .training import SpeechLRN, PhonemeTrainer, ProductionTrainer, PhonemeDataset, SyntheticPhonemeDataset, SequenceTrainer
 from .sequence_decoder import SequenceDecoder, SpeechSequenceLRN, SinusoidalPositionalEncoding
@@ -69,6 +70,11 @@ __all__ = [
     'SpeechSequenceHead',
     'AudioReconstructionHead',
     'ProductionHead',
+    'ArticulatoryHead',
+
+    # SPARC Integration
+    'SPARCWrapper',
+    'VoiceIdentity',
 
     # TTS
     'TTSBackend',
