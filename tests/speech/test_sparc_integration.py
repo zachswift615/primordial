@@ -80,3 +80,16 @@ class TestVoiceIdentity:
         emb2 = voice.get_embedding(batch_size=1)
 
         assert torch.allclose(emb1, emb2)
+
+
+def test_public_imports():
+    """New classes should be importable from speech module."""
+    from primordial.speech import (
+        SPARCWrapper,
+        VoiceIdentity,
+        ArticulatoryHead,
+    )
+
+    assert SPARCWrapper is not None
+    assert VoiceIdentity is not None
+    assert ArticulatoryHead is not None
